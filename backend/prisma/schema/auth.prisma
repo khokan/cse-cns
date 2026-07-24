@@ -13,7 +13,6 @@ model User {
   updatedAt          DateTime   @updatedAt
   sessions           Session[]
   accounts           Account[]
-  admin              Admin?
 
   @@unique([email])
   @@map("user")

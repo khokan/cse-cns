@@ -1,0 +1,16 @@
+model member {
+  MemberID          String  @id(map: "PK_dbo.Member") @db.NVarChar(128)
+  MemberCode        String  @db.NVarChar(Max)
+  MemberName        String? @db.NVarChar(Max)
+  MemberAddress     String? @db.NVarChar(Max)
+  ClearingRegionID  String? @db.NVarChar(Max)
+  AccountCode       String? @db.NVarChar(Max)
+  BankRoutingNumber String? @db.NVarChar(Max)
+  BankAccountNumber String? @db.NVarChar(Max)
+  BankAccountType   String? @db.NVarChar(Max)
+  EFT               Int?
+  BRanchCode        String? @db.NVarChar(Max)
+  TIN               String? @db.NVarChar(Max)
+  MobileNumber      String? @db.NVarChar(Max)
+  EmailAddress      String? @db.NVarChar(Max)
+}

@@ -1,3 +1,0 @@
-// SQL Server doesn't support enums in Prisma
-// Role values: ADMIN, IT, ACCOUNTING, TRECHOLDER, MARKETING
-// UserStatus values: ACTIVE, SUSPENDED, DELETED
