@@ -1,15 +1,20 @@
 import { Server } from "http";
 import app from "./app";
 import { envVars } from "./app/config/env";
+import { prisma } from "./app/lib/prisma";
 
 let server : Server;
 const bootstrap = async() => {
     try {
+        await prisma.$connect();
+        console.log("Database connected successfully");
+
         server = app.listen(envVars.PORT, () => {
             console.log(`Server is running on http://localhost:${envVars.PORT}`);
         });
     } catch (error) {
         console.error('Failed to start server:', error);
+        process.exit(1);
     }
 }
 
