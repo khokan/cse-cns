@@ -3,8 +3,11 @@ import { PrismaMssql } from "@prisma/adapter-mssql";
 import { PrismaClient } from "../../generated/prisma/client";
 import { envVars } from "../config/env";
 
+// ---------------------------------------------------------------------------
+// Connection string parser
+// sqlserver://host:port;database=X;user=Y;password=Z;trustServerCertificate=true
+// ---------------------------------------------------------------------------
 function parseConnectionString(url: string) {
-  // Format: sqlserver://host:port;database=X;user=Y;password=Z;...
   const withoutProtocol = url.replace("sqlserver://", "");
   const [hostPort, ...paramParts] = withoutProtocol.split(";");
   const [host, port] = hostPort.split(":");
@@ -12,7 +15,7 @@ function parseConnectionString(url: string) {
   const params: Record<string, string> = {};
   for (const part of paramParts) {
     const [key, ...valueParts] = part.split("=");
-    params[key.toLowerCase()] = valueParts.join("=");
+    if (key) params[key.toLowerCase()] = valueParts.join("=");
   }
 
   return {
@@ -23,13 +26,74 @@ function parseConnectionString(url: string) {
     password: params.password,
     options: {
       encrypt: false,
-      trustServerCertificate: true,
+      trustServerCertificate: params.trustservercertificate === "true",
     },
   };
 }
 
-const config = parseConnectionString(envVars.DATABASE_URL);
-const adapter = new PrismaMssql(config);
-const prisma = new PrismaClient({ adapter });
+// ---------------------------------------------------------------------------
+// DatabaseManager – a singleton that holds one PrismaClient per database.
+//
+// Usage:
+//   import { db } from '@/app/lib/prisma';
+//   const users = await db.cnsWeb.user.findMany();
+//   const rows  = await db.cns.someModel.findMany();
+// ---------------------------------------------------------------------------
+class DatabaseManager {
+  private static instance: DatabaseManager;
 
-export { prisma };
+  /** Prisma client connected to the CNSWeb database */
+  readonly cnsWeb: PrismaClient;
+
+  /** Prisma client connected to the CNS database */
+  readonly cns: PrismaClient;
+
+  private constructor() {
+    this.cnsWeb = this._createClient(envVars.DATABASE_URL_CNSWEB, "CNSWeb");
+    this.cns    = this._createClient(envVars.DATABASE_URL_CNS,    "CNS");
+  }
+
+  /** Returns (or creates) the single shared instance. */
+  static getInstance(): DatabaseManager {
+    if (!DatabaseManager.instance) {
+      DatabaseManager.instance = new DatabaseManager();
+    }
+    return DatabaseManager.instance;
+  }
+
+  /** Builds a PrismaClient with a MSSQL adapter for the given connection URL. */
+  private _createClient(url: string, label: string): PrismaClient {
+    const config  = parseConnectionString(url);
+    const adapter = new PrismaMssql(config);
+
+    return new PrismaClient({
+      adapter,
+      log:
+        envVars.NODE_ENV === "development"
+          ? [
+              { emit: "event", level: "query"  },
+              { emit: "stdout", level: "error"  },
+              { emit: "stdout", level: "warn"   },
+            ]
+          : [{ emit: "stdout", level: "error" }],
+    });
+  }
+
+  /**
+   * Gracefully disconnect both clients.
+   * Call this on process exit / test teardown.
+   */
+  async disconnect(): Promise<void> {
+    await Promise.all([this.cnsWeb.$disconnect(), this.cns.$disconnect()]);
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Exports
+// ---------------------------------------------------------------------------
+
+/** Singleton DatabaseManager – access both DBs through `db.cnsWeb` / `db.cns` */
+export const db = DatabaseManager.getInstance();
+
+/** Backward-compatible alias – still points to the CNSWeb client */
+export const prisma = db.cnsWeb;
