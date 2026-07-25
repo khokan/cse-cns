@@ -39,7 +39,7 @@ export const getCommonNavItems = (role : UserRole) : NavSection[] => {
     ]
 }
 
-export const adminNavItems: NavSection[] = [
+export const AdminNavItems: NavSection[] = [
     {
         title: "User Management",
         items: [
@@ -48,16 +48,11 @@ export const adminNavItems: NavSection[] = [
                 href: "/admin/dashboard/users",
                 icon: "Shield",
             },
-            {
-                title: "subscriptions",
-                href: "/admin/dashboard/subscriptions",
-                icon: "Users",
-            },
         ],
     },
 ];
 
-export const studentNavItems: NavSection[] = [
+export const TrecHolderNavItems: NavSection[] = [
     {
         title: "subscriptions",
         items: [
@@ -80,9 +75,9 @@ export const getNavItemsByRole = (role : UserRole) : NavSection[] => {
 
     switch (role) {
         case "ADMIN":
-            return [...commonNavItems, ...adminNavItems];
-        case "STUDENT":
-            return [...commonNavItems, ...studentNavItems]
+            return [...commonNavItems, ...AdminNavItems];
+        case "TRECHOLDER":
+            return [...commonNavItems, ...TrecHolderNavItems];
     }
     return commonNavItems
 }
