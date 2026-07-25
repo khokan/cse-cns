@@ -1,5 +1,5 @@
 model User {
-  id                 String    @id
+  id                String      @id @default(uuid())
   name               String
   email              String    @unique
   emailVerified      Boolean   @default(false)
@@ -13,6 +13,7 @@ model User {
   updatedAt          DateTime  @updatedAt
   accounts           Account[]
   sessions           Session[]
+  TrecHolder         TrecHolder?
 
 }
 

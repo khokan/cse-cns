@@ -11,12 +11,12 @@ import { log } from "node:console";
 import { CookieUtils } from "../../utils/cookie";
 import { auth } from "../../lib/auth";
 
-const registerPatient = catchAsync(
+const registerTrecHolder = catchAsync(
     async (req: Request, res: Response) => {
         const maxAge = ms(envVars.ACCESS_TOKEN_EXPIRES_IN as StringValue);
         const payload = req.body;
 
-        const result = await AuthService.registerPatient(payload);
+        const result = await AuthService.registerTrecHolder(payload, req.headers);
 
         const { accessToken, refreshToken, token, ...rest } = result
 
@@ -27,7 +27,7 @@ const registerPatient = catchAsync(
         sendResponse(res, {
             httpStatusCode: status.CREATED,
             success: true,
-            message: "Patient registered successfully",
+            message: "TrecHolder registered successfully",
             data: {
                 token,
                 accessToken,
@@ -41,7 +41,7 @@ const registerPatient = catchAsync(
 const loginUser = catchAsync(
     async (req: Request, res: Response) => {
         const payload = req.body;
-        const result = await AuthService.loginUser(payload);
+        const result = await AuthService.loginUser(payload, req.headers);
         const { accessToken, refreshToken, token, ...rest } = result
 
         tokenUtils.setAccessTokenCookie(res, accessToken);
@@ -253,7 +253,7 @@ const handleOAuthError = catchAsync((req: Request, res: Response) => {
 })
 
 export const AuthController = {
-    registerPatient,
+    registerTrecHolder,
     loginUser,
     getMe,
     changePassword,

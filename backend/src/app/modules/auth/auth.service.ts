@@ -7,12 +7,13 @@ import { IRequestUser } from "../../interfaces/requestUser.interface";
 import { jwtUtils } from "../../utils/jwt";
 import { envVars } from "../../config/env";
 import { JwtPayload } from "jsonwebtoken";
-import { IChangePasswordPayload, ILoginUserPayload, IRegisterPatientPayload } from "./auth.interface";
+import { IChangePasswordPayload, ILoginUserPayload, IRegisterTrecHolderPayload } from "./auth.interface";
 import { UserStatus } from "../../types/auth.types";
-import { email } from "zod";
+import { fromNodeHeaders } from "better-auth/node";
+import { IncomingHttpHeaders } from "http";
 
 
-const registerPatient = async (payload: IRegisterPatientPayload) => {
+const registerTrecHolder = async (payload: IRegisterTrecHolderPayload, headers?: IncomingHttpHeaders | Headers) => {
     const { name, email, password } = payload;
 
     const data = await auth.api.signUpEmail({
@@ -22,20 +23,21 @@ const registerPatient = async (payload: IRegisterPatientPayload) => {
             password,
             //default values
             // needsPasswordChange: false,
-            // role: Role.PATIENT
-        }
+            // role: Role.TrecHolder
+        },
+        headers: headers ? fromNodeHeaders(headers) : undefined,
     })
 
     if (!data.user) {
-        // throw new Error("Failed to register patient");
-        throw new AppError(status.BAD_REQUEST, "Failed to register patient");
+        // throw new Error("Failed to register TrecHolder");
+        throw new AppError(status.BAD_REQUEST, "Failed to register TrecHolder");
     }
 
-    //TODO : Create Patient Profile In Transaction After Sign Up Of Patient In USer Model
+    //TODO : Create TrecHolder Profile In Transaction After Sign Up Of TrecHolder In USer Model
     try {
-        const patient = await prisma.$transaction(async (tx) => {
+        const trecHolder = await prisma.$transaction(async (tx) => {
 
-            const patientTx = await tx.patient.create({
+            const trecHolderTx = await tx.trecHolder.create({
                 data: {
                     userId: data.user.id,
                     name: payload.name,
@@ -43,7 +45,7 @@ const registerPatient = async (payload: IRegisterPatientPayload) => {
                 }
             })
 
-            return patientTx
+            return trecHolderTx
         })
 
         const accessToken = tokenUtils.getAccessToken({
@@ -70,7 +72,7 @@ const registerPatient = async (payload: IRegisterPatientPayload) => {
             ...data,
             accessToken,
             refreshToken,
-            patient
+            trecHolder
         }
 
     } catch (error) {
@@ -87,14 +89,15 @@ const registerPatient = async (payload: IRegisterPatientPayload) => {
 
 
 
-const loginUser = async (payload: ILoginUserPayload) => {
+const loginUser = async (payload: ILoginUserPayload, headers?: IncomingHttpHeaders | Headers) => {
     const { email, password } = payload;
 
     const data = await auth.api.signInEmail({
         body: {
             email,
             password,
-        }
+        },
+        headers: headers ? fromNodeHeaders(headers) : undefined,
     })
 
     if (data.user.status === UserStatus.BLOCKED) {
@@ -139,24 +142,10 @@ const getMe = async (user : IRequestUser) => {
             id : user.userId,
         },
         include : {
-            patient : {
+            TrecHolder : {
                 include : {
-                    appointments : true,
-                    reviews : true,
-                    prescriptions : true,
-                    medicalReports : true,
-                    patientHealthData : true,
-                }
+                },
             },
-            doctor : {
-                include : {
-                    specialities : true,
-                    appointments : true,
-                    reviews : true,
-                    prescriptions : true,
-                }
-            },
-            admin : true,
         }
     })
 
@@ -397,14 +386,14 @@ const resetPassword = async (email : string, otp : string, newPassword : string)
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const googleLoginSuccess = async (session : Record<string, any>) =>{
-    const isPatientExists = await prisma.patient.findUnique({
+    const isTrecHolderExists = await prisma.trecHolder.findUnique({
         where : {
             userId : session.user.id,
         }
     })
 
-    if(!isPatientExists){
-        await prisma.patient.create({
+    if(!isTrecHolderExists){
+        await prisma.trecHolder.create({
             data : {
                 userId : session.user.id,
                 name : session.user.name,
@@ -434,7 +423,7 @@ const googleLoginSuccess = async (session : Record<string, any>) =>{
 
 
 export const AuthService = {
-    registerPatient,
+    registerTrecHolder,
     loginUser,
     getMe,
     getNewToken,

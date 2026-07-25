@@ -4,80 +4,60 @@ import { envVars } from "./app/config/env";
 import { db } from "./app/lib/prisma";
 import { seedSuperAdmin } from "./app/utils/seed";
 
-let server : Server;
-const bootstrap = async() => {
+let server: Server;
+
+const bootstrap = async () => {
     try {
         await db.cnsWeb.$connect();
         await db.cns.$connect();
         console.log("✅ Both databases connected successfully (CNSWeb + CNS)");
-         await seedSuperAdmin();
+
+        await seedSuperAdmin();
+
         server = app.listen(envVars.PORT, () => {
-            console.log(`Server is running on http://localhost:${envVars.PORT}`);
+            console.log(`🚀 Server running on http://localhost:${envVars.PORT}`);
         });
     } catch (error) {
-        console.error('Failed to start server:', error);
+        console.error("❌ Failed to start server:", error);
         process.exit(1);
     }
-}
+};
 
-// SIGTERM signal handler
-process.on("SIGTERM", () => {
-    console.log("SIGTERM signal received. Shutting down server...");
+const gracefulShutdown = async (signal: string, error?: unknown) => {
+    console.log(`⚠️ ${signal} received. Initiating graceful shutdown...`);
+    if (error) {
+        console.error("Error details:", error);
+    }
 
-    if(server){
+    if (server) {
         server.close(async () => {
-            await db.disconnect();
-            console.log("Server closed gracefully.");
-            process.exit(1);
+            console.log("HTTP server closed.");
+            try {
+                await db.disconnect();
+                console.log("✅ All database connections closed successfully.");
+                process.exit(0);
+            } catch (disconnectError) {
+                console.error("Error disconnecting database clients:", disconnectError);
+                process.exit(1);
+            }
         });
-    } 
-    
-    process.exit(1);
-    
-})
-
-// SIGINT signal handler
-
-process.on("SIGINT", () => {
-    console.log("SIGINT signal received. Shutting down server...");
-
-    if(server){
-        server.close(async () => {
+    } else {
+        try {
             await db.disconnect();
-            console.log("Server closed gracefully.");
-            process.exit(1);
-        });
-
+            console.log("✅ All database connections closed successfully.");
+        } catch (disconnectError) {
+            console.error("Error disconnecting database clients:", disconnectError);
+        }
+        process.exit(1);
     }
+};
 
-    process.exit(1);
-});
+// Process Termination Signal Handlers
+process.on("SIGTERM", () => gracefulShutdown("SIGTERM"));
+process.on("SIGINT", () => gracefulShutdown("SIGINT"));
 
-//uncaught exception handler
-process.on('uncaughtException', (error) => {
-    console.log("Uncaught Exception Detected... Shutting down server", error);
-
-    if(server){
-        server.close(() => {
-            process.exit(1);
-        })
-    }
-
-    process.exit(1);
-})
-
-process.on("unhandledRejection", (error) => {
-    console.log("Unhandled Rejection Detected... Shutting down server", error);
-
-    if(server){
-        server.close(() => {
-            process.exit(1);
-        })
-    }
-
-    process.exit(1);
-})
-
-//unhandled rejection handler
+// Unhandled Exception & Rejection Handlers
+process.on("uncaughtException", (error) => gracefulShutdown("uncaughtException", error));
+process.on("unhandledRejection", (reason) => gracefulShutdown("unhandledRejection", reason));
 
 bootstrap();

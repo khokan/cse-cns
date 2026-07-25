@@ -97,7 +97,7 @@ ADMIN_EMAIL, ADMIN_PASSWORD
 | `src/app/lib/prisma.ts` | `DatabaseManager` singleton + `db` export |
 | `prisma/schema/schema.prisma` | Prisma generator config (MSSQL, output → `src/generated/prisma`) |
 | `prisma/schema/auth.prisma` | User, Session, Account, Verification models |
-| `prisma/schema/member.prisma` | Patient, Doctor, Admin profile models |
+| `prisma/schema/member.prisma` | TrecHolder, Doctor, Admin profile models |
 | `prisma.config.ts` | Prisma CLI config — points to `DATABASE_URL_CNSWEB` |
 
 #### `DatabaseManager` — Key Design
@@ -137,7 +137,7 @@ await prisma.user.findMany(); // → db.cnsWeb
 
 | Method | Path | Auth Required | Description |
 |--------|------|:---:|-------------|
-| `POST` | `/api/v1/auth/register` | — | Register new patient (creates User + Patient in transaction) |
+| `POST` | `/api/v1/auth/register` | — | Register new TrecHolder (creates User + TrecHolder in transaction) |
 | `POST` | `/api/v1/auth/login` | — | Email/password login |
 | `GET`  | `/api/v1/auth/me` | ✅ All roles | Get current user profile with relations |
 | `POST` | `/api/v1/auth/refresh-token` | — | Rotate access + refresh tokens via session |
@@ -147,7 +147,7 @@ await prisma.user.findMany(); // → db.cnsWeb
 | `POST` | `/api/v1/auth/reset-password` | — | Reset password with OTP |
 | `POST` | `/api/v1/auth/verify-email` | — | Verify email with 6-digit OTP |
 | `GET`  | `/api/v1/auth/login/google` | — | Initiates Google OAuth (renders redirect page) |
-| `GET`  | `/api/v1/auth/google/success` | — | OAuth callback — creates patient profile if new |
+| `GET`  | `/api/v1/auth/google/success` | — | OAuth callback — creates TrecHolder profile if new |
 | `GET`  | `/api/v1/auth/oauth/error` | — | OAuth error redirect handler |
 
 #### Token Strategy
@@ -240,7 +240,7 @@ enum UserStatus { ACTIVE, BLOCKED, DELETED }
 #### `QueryBuilder` — Usage Pattern
 
 ```typescript
-const result = await new QueryBuilder(prisma.patient, req.query, {
+const result = await new QueryBuilder(prisma.TrecHolder, req.query, {
     searchableFields: ['name', 'email'],
     filterableFields: ['status', 'user.role'],
 })
@@ -251,7 +251,7 @@ const result = await new QueryBuilder(prisma.patient, req.query, {
     .include({ user: true })
     .execute();
 
-// result = { data: Patient[], meta: { page, limit, total, totalPages } }
+// result = { data: trecHolder[], meta: { page, limit, total, totalPages } }
 ```
 
 **Supported filter operators via query string:**
@@ -317,7 +317,7 @@ tsx watch src/server.ts
 > **Note:** The following items were identified during Sprint 1 and are deferred.
 
 - [ ] `auth.ts` passes `provider: "postgresql"` to the Prisma adapter — should be `"sqlserver"` to match actual DB
-- [ ] `registerPatient` in `auth.service.ts` imports `{ email }` from `"zod"` (unused import — lint warning)
+- [ ] `registerTrecHolder` in `auth.service.ts` imports `{ email }` from `"zod"` (unused import — lint warning)
 - [ ] `auth.controller.ts` imports `{ log }` from `"node:console"` (unused import)
 - [ ] `checkAuth.ts` still imports `prisma` (alias) — can be updated to `db.cnsWeb` for clarity
 - [ ] `seed.ts` still imports `prisma` (alias) — same as above

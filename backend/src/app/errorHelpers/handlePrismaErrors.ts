@@ -1,5 +1,5 @@
 import status from "http-status"
-import { Prisma } from "../../generated/prisma/client"
+import { Prisma } from "../../generated/cnsweb/client"
 import { TErrorResponse, TErrorSources } from "../interfaces/error.interface"
 
 const getStatusCodeFromPrismaError = (errorCode: string): number => {
@@ -198,12 +198,12 @@ export const handlePrismaClientValidationError = (error: Prisma.PrismaClientVali
     }
 }
 
-export const handlerPrismaClientInitializationError = (error: Prisma.PrismaClientInitializationError) : TErrorResponse => {
+export const handlePrismaClientInitializationError = (error: Prisma.PrismaClientInitializationError) : TErrorResponse => {
     const statusCode = error.errorCode ? getStatusCodeFromPrismaError(error.errorCode) : status.SERVICE_UNAVAILABLE
 
-    const cleanMessage = error.message;
+    let cleanMessage = error.message;
 
-    cleanMessage.replace(/Invalid `.*?` invocation:?\s*/i, "")
+    cleanMessage = cleanMessage.replace(/Invalid `.*?` invocation:?\s*/i, "")
 
     const lines = cleanMessage.split("\n").filter(line => line.trim());
 
@@ -223,9 +223,9 @@ export const handlerPrismaClientInitializationError = (error: Prisma.PrismaClien
         errorSources,
     }
 }
+export const handlerPrismaClientInitializationError = handlePrismaClientInitializationError;
 
-
-export const handlerPrismaClientRustPanicError = () : TErrorResponse => {
+export const handlePrismaClientRustPanicError = () : TErrorResponse => {
     const errorSources : TErrorSources[] = [{
         path : "Rust Engine Crashed",
         message : "The database engine encountered a fatal error and crashed. This is usually due to an internal bug in the Prisma engine or an unexpected edge case in the database operation. Please check the Prisma logs for more details and consider reporting this issue to the Prisma team if it persists."
@@ -238,3 +238,4 @@ export const handlerPrismaClientRustPanicError = () : TErrorResponse => {
         errorSources,
     }
 }
+export const handlerPrismaClientRustPanicError = handlePrismaClientRustPanicError;

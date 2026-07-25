@@ -51,10 +51,10 @@ Features live under `src/app/<feature>/` and split into four files: `<feature>.r
 
 ## Current state / gotchas
 
-This backend is early WIP repurposed from a doctor/patient template, so several things are inconsistent and will not compile/run end-to-end yet:
+This backend is early WIP repurposed from a doctor/TrecHolder template, so several things are inconsistent and will not compile/run end-to-end yet:
 
 - `src/app.ts` only registers CORS + body parsers and a `/` health route. It does **not** yet mount `AuthRoutes`, `globalErrorHandler`, `notFound`, `cookie-parser`, or an EJS view engine (needed by `authController.googleLogin`, which calls `res.render`).
-- **Role mismatch**: `types/auth.types.ts` defines roles `ADMIN, IT, ACCOUNTING, TRECHOLDER, MARKETING`, but `auth.route.ts` and `auth.service.ts` reference `SUPER_ADMIN`, `DOCTOR`, `PATIENT` and Prisma models (`patient`, `doctor`, `admin`, `appointments`, …) that do not exist in the current schema.
+- **Role mismatch**: `types/auth.types.ts` defines roles `ADMIN, IT, ACCOUNTING, TRECHOLDER, MARKETING`, but `auth.route.ts` and `auth.service.ts` reference `SUPER_ADMIN`, `DOCTOR`, `TrecHolder` and Prisma models (`TrecHolder`, `doctor`, `admin`, `appointments`, …) that do not exist in the current schema.
 - `lib/auth.ts` sets the better-auth `prismaAdapter` provider to `"postgresql"` while the actual database is SQL Server.
 
 When adding real features, expect to reconcile the role enum with the routes/services and to add the missing schema models + `shared/` helpers.

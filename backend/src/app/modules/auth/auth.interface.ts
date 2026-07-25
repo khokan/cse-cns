@@ -3,7 +3,7 @@ export interface ILoginUserPayload {
     password: string;
 }
 
-export interface IRegisterPatientPayload {
+export interface IRegisterTrecHolderPayload {
     name: string;
     email: string;
     password: string;

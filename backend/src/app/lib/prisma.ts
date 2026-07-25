@@ -1,6 +1,7 @@
 import "dotenv/config";
 import { PrismaMssql } from "@prisma/adapter-mssql";
-import { PrismaClient } from "../../generated/prisma/client";
+import { PrismaClient as PrismaClientCnsWeb } from "../../generated/cnsweb/client";
+import { PrismaClient as PrismaClientCns } from "../../generated/cns/client";
 import { envVars } from "../config/env";
 
 // ---------------------------------------------------------------------------
@@ -43,14 +44,14 @@ class DatabaseManager {
   private static instance: DatabaseManager;
 
   /** Prisma client connected to the CNSWeb database */
-  readonly cnsWeb: PrismaClient;
+  readonly cnsWeb: PrismaClientCnsWeb;
 
   /** Prisma client connected to the CNS database */
-  readonly cns: PrismaClient;
+  readonly cns: PrismaClientCns;
 
   private constructor() {
-    this.cnsWeb = this._createClient(envVars.DATABASE_URL_CNSWEB, "CNSWeb");
-    this.cns    = this._createClient(envVars.DATABASE_URL_CNS,    "CNS");
+    this.cnsWeb = this._createClient(PrismaClientCnsWeb, envVars.DATABASE_URL_CNSWEB, "CNSWeb");
+    this.cns    = this._createClient(PrismaClientCns,    envVars.DATABASE_URL_CNS,    "CNS");
   }
 
   /** Returns (or creates) the single shared instance. */
@@ -62,11 +63,11 @@ class DatabaseManager {
   }
 
   /** Builds a PrismaClient with a MSSQL adapter for the given connection URL. */
-  private _createClient(url: string, label: string): PrismaClient {
+  private _createClient<T>(ClientClass: new (options: any) => T, url: string, label: string): T {
     const config  = parseConnectionString(url);
     const adapter = new PrismaMssql(config);
 
-    return new PrismaClient({
+    return new ClientClass({
       adapter,
       log:
         envVars.NODE_ENV === "development"
