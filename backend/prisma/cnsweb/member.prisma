@@ -1,4 +1,4 @@
-model member {
+model Member {
   MemberID          String  @id(map: "PK_dbo.Member") @db.NVarChar(128)
   MemberCode        String  @db.NVarChar(Max)
   MemberName        String? @db.NVarChar(Max)

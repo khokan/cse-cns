@@ -1,0 +1,16 @@
+model TaxToNBR {
+  ID             BigInt    @id(map: "PK_TaxToNBR") @default(autoincrement())
+  FromDate       DateTime? @db.DateTime
+  ToDate         DateTime? @db.DateTime
+  ContractNumber String?   @db.VarChar(50)
+  PaymentDate    DateTime? @db.DateTime
+  DeducteeTIN    String?   @db.VarChar(200)
+  TRECHolderName String?   @db.VarChar(200)
+  MobileNumber   String?   @db.VarChar(200)
+  EmailAddress   String?   @db.VarChar(200)
+  SectionNumber  String?   @db.VarChar(200)
+  TradeVolume    Decimal?  @db.Decimal(38, 2)
+  CSECommission  Decimal?  @db.Decimal(38, 2)
+  PaymentAmount  Decimal?  @db.Decimal(38, 2)
+  MemberID       String    @db.VarChar(20)
+}

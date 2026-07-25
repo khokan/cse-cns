@@ -8,12 +8,23 @@
     "build": "tsc",
     "dev": "tsx watch src/server.ts",
     "lint": "eslint ./src/**/*",
-    "migrate": "prisma migrate dev",
-    "generate": "prisma generate",
-    "studio": "prisma studio",
-    "push": "prisma db push",
-    "pull": "prisma db pull",
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "echo \"Error: no test specified\" && exit 1",
+
+    "generate": "prisma generate --config prisma.cnsweb.config.ts && prisma generate --config prisma.cns.config.ts",
+    "generate:cnsweb": "prisma generate --config prisma.cnsweb.config.ts",
+    "generate:cns": "prisma generate --config prisma.cns.config.ts",
+
+    "migrate:cnsweb": "prisma migrate dev --config prisma.cnsweb.config.ts",
+    "migrate:cns": "prisma migrate dev --config prisma.cns.config.ts",
+
+    "push:cnsweb": "prisma db push --config prisma.cnsweb.config.ts",
+    "push:cns": "prisma db push --config prisma.cns.config.ts",
+
+    "pull:cnsweb": "prisma db pull --config prisma.cnsweb.config.ts",
+    "pull:cns": "prisma db pull --config prisma.cns.config.ts",
+
+    "studio:cnsweb": "prisma studio --config prisma.cnsweb.config.ts",
+    "studio:cns": "prisma studio --config prisma.cns.config.ts"
   },
   "keywords": [],
   "author": "",
