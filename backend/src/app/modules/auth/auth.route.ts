@@ -6,6 +6,7 @@ import { UserRole } from "../../types/auth.types";
 const router = Router();
 
 router.get("/me", checkAuth(UserRole.ADMIN, UserRole.TRECHOLDER), AuthController.getMe);
+router.get("/", checkAuth(UserRole.ADMIN), AuthController.listUsers);
 router.post("/change-password", checkAuth(UserRole.ADMIN, UserRole.TRECHOLDER), AuthController.changePassword);
 router.post("/logout", checkAuth(UserRole.ADMIN, UserRole.TRECHOLDER), AuthController.logoutUser);
 router.post("/forget-password", AuthController.forgetPassword);

@@ -22,6 +22,18 @@ const getMe = catchAsync(
     }
 );
 
+const listUsers = catchAsync(
+    async (_req: Request, res: Response) => {
+        const result = await AuthService.listUsers();
+        sendResponse(res, {
+            httpStatusCode: status.OK,
+            success: true,
+            message: "User list fetched successfully",
+            data: result,
+        });
+    }
+  );
+
 const changePassword = catchAsync(
     async (req: Request, res: Response) => {
         const payload = req.body;
@@ -147,6 +159,7 @@ const handleOAuthError = catchAsync((req: Request, res: Response) => {
 
 export const AuthController = {
     getMe,
+    listUsers,
     changePassword,
     logoutUser,
     verifyEmail,

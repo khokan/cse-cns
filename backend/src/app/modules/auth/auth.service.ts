@@ -25,6 +25,21 @@ const getMe = async (user: IRequestUser) => {
     return isUserExists;
 };
 
+ const listUsers = async () => {
+    return prisma.user.findMany({
+      orderBy: { createdAt: "desc" },
+      select: {
+        id: true,
+        name: true,
+        email: true,
+        role: true,
+        image: true,
+        emailVerified: true,
+        createdAt: true
+      },
+    });
+  };
+
 const changePassword = async (payload: IChangePasswordPayload, sessionToken: string) => {
     const session = await auth.api.getSession({
         headers: new Headers({
@@ -184,6 +199,7 @@ const googleLoginSuccess = async (session: Record<string, any>) => {
 
 export const AuthService = {
     getMe,
+    listUsers,
     changePassword,
     logoutUser,
     forgetPassword,
