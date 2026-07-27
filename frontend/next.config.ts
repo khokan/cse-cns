@@ -11,6 +11,15 @@ const nextConfig: NextConfig = {
     ],
   },
 
+  // Allow development access from specific origins
+  allowedDevOrigins: [
+    '192.168.102.94',           // Your server IP
+    'localhost',
+    '127.0.0.1',
+    // Add any other IPs that need dev access
+    // e.g., '192.168.1.100' for another developer's machine
+  ],
+  
   // better-auth proxy
   async rewrites() {
     return [

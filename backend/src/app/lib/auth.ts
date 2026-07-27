@@ -150,8 +150,12 @@ export const auth = betterAuth({
         signIn : `${envVars.BETTER_AUTH_URL}/api/v1/auth/google/success`,
     },
 
-    trustedOrigins: [process.env.BETTER_AUTH_URL || "http://localhost:5000", envVars.FRONTEND_URL],
+    trustedOrigins: [envVars.BETTER_AUTH_URL || "http://localhost:5000", envVars.FRONTEND_URL || "http://localhost:3000", "http://192.168.102.94:5000",
+    "http://192.168.102.94:3000"],
 
+    // trustedOrigins:['*'],
+    // csrf: false, // Make sure CSRF is disabled for testing
+     
     advanced: {
         // disableCSRFCheck: true,
         useSecureCookies : false,

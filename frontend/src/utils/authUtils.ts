@@ -43,9 +43,9 @@ export const isRouteMatches = (pathname : string, routes : RouteConfig) => {
     return routes.pattern.some((pattern : RegExp) => pattern.test(pathname));
 }
 
-export const getRouteOwner = (pathname : string) : "SUPER_ADMIN" | "ADMIN" | "STUDENT" | "COMMON" | null => {
+export const getRouteOwner = (pathname : string) :  "ADMIN" | "TRECHHOLDER" | "COMMON" | null => {
     if (isRouteMatches(pathname, superAdminProtectedRoutes)) {
-        return "SUPER_ADMIN";
+        return "ADMIN";
     }
 
     if(isRouteMatches(pathname, adminProtectedRoutes)) {
@@ -53,7 +53,7 @@ export const getRouteOwner = (pathname : string) : "SUPER_ADMIN" | "ADMIN" | "ST
     }
     
     if(isRouteMatches(pathname, studentProtectedRoutes)) {
-        return "STUDENT";
+        return "TRECHHOLDER";
     }
 
     if(isRouteMatches(pathname, commonProtectedRoutes)) {
@@ -67,7 +67,7 @@ export const getDefaultDashboardRoute = (role : UserRole) => {
     if(role === "ADMIN") {
         return "/admin/dashboard";
     }
-    if(role === "STUDENT") {
+    if(role === "TRECHOLDER") {
         return "/dashboard";
     }
 

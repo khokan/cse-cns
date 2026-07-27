@@ -12,9 +12,18 @@ import { notFound } from "./app/middleware/notFound";
 
 const app: Application = express();
 
+
+// CORS - Allow everything in development
+// app.use(cors({
+//   origin: true,
+//   credentials: true,
+//   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+//   allowedHeaders: ['Content-Type', 'Authorization'],
+// }));
+
 app.use(
   cors({
-    origin: ["http://localhost:3000", "http://localhost:5000"],
+    origin: [envVars.FRONTEND_URL || "http://localhost:3000", envVars.BETTER_AUTH_URL || "http://localhost:5000"],
     credentials: true,
     methods: ["GET", "POST", "PUT", "DELETE", "PATCH"],
     allowedHeaders: ["Content-Type", "Authorization"],
