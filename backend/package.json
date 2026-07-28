@@ -9,20 +9,15 @@
     "dev": "tsx watch src/server.ts",
     "lint": "eslint ./src/**/*",
     "test": "echo \"Error: no test specified\" && exit 1",
-
     "generate": "prisma generate --config prisma.cnsweb.config.ts && prisma generate --config prisma.cns.config.ts",
     "generate:cnsweb": "prisma generate --config prisma.cnsweb.config.ts",
     "generate:cns": "prisma generate --config prisma.cns.config.ts",
-
     "migrate:cnsweb": "prisma migrate dev --config prisma.cnsweb.config.ts",
     "migrate:cns": "prisma migrate dev --config prisma.cns.config.ts",
-
     "push:cnsweb": "prisma db push --config prisma.cnsweb.config.ts",
     "push:cns": "prisma db push --config prisma.cns.config.ts",
-
     "pull:cnsweb": "prisma db pull --config prisma.cnsweb.config.ts",
     "pull:cns": "prisma db pull --config prisma.cns.config.ts",
-
     "studio:cnsweb": "prisma studio --config prisma.cnsweb.config.ts",
     "studio:cns": "prisma studio --config prisma.cns.config.ts"
   },
@@ -41,7 +36,9 @@
     "date-fns": "^4.1.0",
     "dotenv": "^17.2.3",
     "ejs": "^4.0.1",
+    "exceljs": "^4.4.0",
     "express": "^5.2.1",
+    "fast-csv": "^5.0.7",
     "http-status": "^2.1.0",
     "jsonwebtoken": "^9.0.3",
     "ms": "^2.1.3",
@@ -50,7 +47,9 @@
     "multer-storage-cloudinary": "^4.0.0",
     "node-cron": "^4.2.1",
     "nodemailer": "^8.0.1",
+    "p-queue": "^9.3.3",
     "pdfkit": "^0.17.2",
+    "puppeteer": "^25.4.0",
     "qs": "^6.14.1",
     "stripe": "^20.3.1",
     "uuid": "^13.0.0",

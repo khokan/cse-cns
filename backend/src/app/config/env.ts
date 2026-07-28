@@ -31,6 +31,9 @@ interface EnvConfig {
     FRONTEND_URL: string;
     ADMIN_EMAIL: string;
     ADMIN_PASSWORD: string;
+    REPORTS_UPLOAD_DIR: string;
+    REPORTS_BASE_URL: string;
+    REPORT_QUEUE_CONCURRENCY: number;
 }
 
 
@@ -59,7 +62,10 @@ const loadEnvVariables = (): EnvConfig => {
         'GOOGLE_CALLBACK_URL',
         'FRONTEND_URL',
         'ADMIN_EMAIL',
-        'ADMIN_PASSWORD'
+        'ADMIN_PASSWORD',
+        'REPORTS_UPLOAD_DIR',
+        'REPORTS_BASE_URL',
+        'REPORT_QUEUE_CONCURRENCY'
     ]
 
     requireEnvVariable.forEach((variable) => {
@@ -94,7 +100,10 @@ const loadEnvVariables = (): EnvConfig => {
         GOOGLE_CALLBACK_URL: process.env.GOOGLE_CALLBACK_URL as string,
         FRONTEND_URL: process.env.FRONTEND_URL as string,
         ADMIN_EMAIL: process.env.ADMIN_EMAIL as string,
-        ADMIN_PASSWORD: process.env.ADMIN_PASSWORD as string
+        ADMIN_PASSWORD: process.env.ADMIN_PASSWORD as string,
+        REPORTS_UPLOAD_DIR: process.env.REPORTS_UPLOAD_DIR as string,
+        REPORTS_BASE_URL: process.env.REPORTS_BASE_URL as string,
+        REPORT_QUEUE_CONCURRENCY: parseInt(process.env.REPORT_QUEUE_CONCURRENCY || '2', 10),
     }
 }
 

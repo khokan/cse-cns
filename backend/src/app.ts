@@ -1,14 +1,18 @@
 import express, { Application, Request, Response } from "express";
 import { toNodeHandler } from "better-auth/node";
 import path from "path";
+import { fileURLToPath } from "url";
 import cors from "cors";
-import { envVars } from "./app/config/env";
+import { envVars } from "./app/config/env.js";
 import qs from "qs";
-import { auth } from "./app/lib/auth";
+import { auth } from "./app/lib/auth.js";
 import cookieParser from "cookie-parser";
-import { IndexRoutes } from "./app/routes";
-import { globalErrorHandler } from "./app/middleware/globalErrorHandler";
-import { notFound } from "./app/middleware/notFound";
+import { IndexRoutes } from "./app/routes/index.js";
+import { globalErrorHandler } from "./app/middleware/globalErrorHandler.js";
+import { notFound } from "./app/middleware/notFound.js";
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+
 
 const app: Application = express();
 
@@ -37,6 +41,13 @@ app.use(cookieParser());
 
 // Better Auth handler
 app.use("/api/auth", toNodeHandler(auth));
+
+// Serve generated report files as static (dev convenience)
+// Files are under: <backend>/uploads/reports/<userId>/<jobId>.<ext>
+app.use(
+    "/uploads",
+    express.static(path.resolve(__dirname, "..", "uploads"))
+);
 
 // Application v1 API routes (/api/v1/auth/login, etc.)
 app.use("/api/v1", IndexRoutes);

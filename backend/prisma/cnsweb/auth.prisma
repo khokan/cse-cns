@@ -14,6 +14,7 @@ model User {
   accounts           Account[]
   sessions           Session[]
   TrecHolder         TrecHolder?
+  reportJobs         ReportJob[]
 
 }
 

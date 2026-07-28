@@ -5,3 +5,7 @@ node_modules
 dist
 migrations
 src/generated
+
+# Generated report files (keep directory, ignore contents)
+uploads/reports/**/*
+!uploads/reports/.gitkeep
