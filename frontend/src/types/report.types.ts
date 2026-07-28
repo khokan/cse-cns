@@ -84,16 +84,21 @@ export interface ReportJobQueryParams {
 }
 
 // ---------------------------------------------------------------------------
+// Pagination meta
+// ---------------------------------------------------------------------------
+export interface ReportMeta {
+  page: number;
+  limit: number;
+  total: number;
+  totalPages: number;
+}
+
+// ---------------------------------------------------------------------------
 // Paginated list response
 // ---------------------------------------------------------------------------
 export interface PaginatedReportJobs {
   data: ReportJob[];
-  meta: {
-    page: number;
-    limit: number;
-    total: number;
-    totalPages: number;
-  };
+  meta: ReportMeta;
 }
 
 // ---------------------------------------------------------------------------

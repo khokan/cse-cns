@@ -19,10 +19,17 @@ export default function RegisterPage() {
   async function onSubmit(formData: FormData) {
     setLoading(true);
     try {
+      const trecHolderId = String(formData.get("trecHolderId") ?? "").trim();
+      if (!trecHolderId) {
+        toast.error("Member ID / TREC ID is required.");
+        return;
+      }
+
       const payload = {
         name: String(formData.get("name") ?? ""),
         email: String(formData.get("email") ?? ""),
         password: String(formData.get("password") ?? ""),
+        trecHolderId,
         role,
       };
 
@@ -159,6 +166,24 @@ export default function RegisterPage() {
                         required
                         className="h-11 rounded-lg border-2 border-border/50 bg-background px-4 transition-all focus:border-primary/50 focus:shadow-sm"
                       />
+                    </div>
+
+                    {/* Member ID / TREC ID */}
+                    <div className="space-y-2">
+                      <label htmlFor="trecHolderId" className="text-sm font-medium text-foreground">
+                        Member ID / TREC ID <span className="text-red-500">*</span>
+                      </label>
+                      <Input
+                        id="trecHolderId"
+                        name="trecHolderId"
+                        placeholder="e.g. 121001"
+                        type="text"
+                        required
+                        className="h-11 rounded-lg border-2 border-border/50 bg-background px-4 transition-all focus:border-primary/50 focus:shadow-sm"
+                      />
+                      <p className="text-xs text-muted-foreground">
+                        Your official Member ID / TREC Holder Code
+                      </p>
                     </div>
 
                     {/* Email */}

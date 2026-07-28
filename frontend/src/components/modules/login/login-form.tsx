@@ -23,12 +23,23 @@ export default function LoginPage() {
       const email = String(formData.get("email") ?? "").trim();
       const password = String(formData.get("password") ?? "");
 
-      const { error } = await authClient.signIn.email({ email, password });
+      const { data, error } = await authClient.signIn.email({ email, password });
 
       if (error) {
-        toast.error(`Login failed: ${error.message}`);
+        const msg = error.message?.toLowerCase() ?? "";
+        if (msg.includes("email not verified") || msg.includes("email_not_verified") || msg.includes("verify your email")) {
+          toast.error("Email not verified");
+        } else {
+          toast.error(`Login failed: ${error.message}`);
+        }
         return;
       }
+
+      if (data?.user && !data.user.emailVerified) {
+        toast.error("Email not verified");
+        return;
+      }
+
       toast.success("Welcome back!");
       router.push(next);
       router.refresh();

@@ -10,7 +10,9 @@ import {
 import { REPORT_POLL_INTERVAL_MS } from "@/constants/reportConstants";
 import type {
   CreateReportJobPayload,
+  ReportJob,
   ReportJobQueryParams,
+  ReportMeta,
   ReportStatus,
 } from "@/types/report.types";
 
@@ -22,33 +24,38 @@ const isTerminal = (s: ReportStatus) => TERMINAL.includes(s);
 // Hook: list of report jobs with adaptive polling
 // Polls every 3s while any job is PENDING or PROCESSING
 // ---------------------------------------------------------------------------
+type ReportJobsResult = { data: ReportJob[]; meta: ReportMeta | null };
+
 export const useReportJobs = (params?: ReportJobQueryParams) =>
-  useQuery({
+  useQuery<ReportJobsResult>({
     queryKey: ["report-jobs", params],
-    queryFn: async () => {
-      const { data, error } = await getReportJobs(params);
-      if (error) throw new Error(error.message);
-      return data;
+    queryFn: async (): Promise<ReportJobsResult> => {
+      const res = await getReportJobs(params);
+      if (res.error) throw new Error(res.error.message);
+      return {
+        data: res.data?.data ?? [],
+        meta: res.data?.meta ?? null,
+      };
     },
     refetchInterval: (query) => {
-      const jobs = query.state.data?.data ?? [];
+      const jobs = (query.state.data as ReportJobsResult | undefined)?.data ?? [];
       const hasActive = jobs.some((j) => !isTerminal(j.status));
       return hasActive ? REPORT_POLL_INTERVAL_MS : false;
     },
-    staleTime: 1000,
+    staleTime: 10,
   });
 
 // ---------------------------------------------------------------------------
 // Hook: single job status (for in-progress polling on the form page)
 // ---------------------------------------------------------------------------
 export const useReportJob = (id: string | null) =>
-  useQuery({
+  useQuery<ReportJob | null>({
     queryKey: ["report-job", id],
-    queryFn: async () => {
+    queryFn: async (): Promise<ReportJob | null> => {
       if (!id) return null;
-      const { data, error } = await getReportJob(id);
-      if (error) throw new Error(error.message);
-      return data?.data ?? null;
+      const res = await getReportJob(id);
+      if (res.error) throw new Error(res.error.message);
+      return res.data?.data ?? null;
     },
     enabled: !!id,
     refetchInterval: (query) => {
@@ -66,9 +73,9 @@ export const useRequestReport = () => {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: async (payload: CreateReportJobPayload) => {
-      const { data, error } = await requestReport(payload);
-      if (error) throw new Error(error.message);
-      return data?.data;
+      const res = await requestReport(payload);
+      if (res.error) throw new Error(res.error.message);
+      return res.data?.data;
     },
     onSuccess: () => {
       // Refresh the jobs list after a new job is created
@@ -84,9 +91,9 @@ export const useCancelReportJob = () => {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: async (id: string) => {
-      const { data, error } = await cancelReportJob(id);
-      if (error) throw new Error(error.message);
-      return data;
+      const res = await cancelReportJob(id);
+      if (res.error) throw new Error(res.error.message);
+      return res.data;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["report-jobs"] });
