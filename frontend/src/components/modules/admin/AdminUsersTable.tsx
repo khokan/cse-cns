@@ -13,7 +13,7 @@ export interface AdminUser {
   emailVerified?: boolean;
   createdAt?: string;
   _count?: {
-    subscriptions: number;
+    trecholders: number;
   };
 }
 
@@ -26,7 +26,7 @@ export default function AdminUsersTable({ users }: AdminUsersTableProps) {
     <Card className="rounded-3xl">
       <CardHeader>
         <CardTitle>Users</CardTitle>
-        <CardDescription>View all registered users and subscription counts.</CardDescription>
+        <CardDescription>View all registered users and trecholder counts.</CardDescription>
       </CardHeader>
       <CardContent>
         {users.length === 0 ? (

@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { FileBarChart, Loader2, Filter, Users } from "lucide-react";
 import { ReportTypeSelector } from "./ReportTypeSelector";
-import { useRequestReport } from "@/lib/hooks/useReportJobs";
+import { useRequestReport } from "@/hooks/useReportJobs";
 import { REPORT_TYPE_CONFIGS } from "@/constants/reportConstants";
 import type { ReportFormat, ReportType } from "@/types/report.types";
 import { cn } from "@/utils/utils";

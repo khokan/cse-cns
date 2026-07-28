@@ -12,7 +12,7 @@ import { Footer } from "@/components/shared/footer";
 import { Rocket, BookOpen, Award, Zap, ArrowRight, CheckCircle2 } from "lucide-react";
 
 export default function RegisterPage() {
-  const role: "STUDENT" = "STUDENT";
+  const role: "TRECHOLDER" = "TRECHOLDER";
   const [loading, setLoading] = useState(false);
   const router = useRouter();
 
@@ -55,7 +55,7 @@ export default function RegisterPage() {
                 Start Your Learning Journey
               </h1>
               <p className="mt-4 text-lg text-muted-foreground">
-                Join thousands of students and unlock your potential with guided learning paths,
+                Join thousands of trecholders and unlock your potential with guided learning paths,
                 premium resources, and AI-powered support.
               </p>
             </div>
@@ -194,7 +194,7 @@ export default function RegisterPage() {
                       </p>
                     </div>
 
-                    {/* Role is fixed to Student for self-registration */}
+                    {/* Role is fixed to trecholder for self-registration */}
 
                     {/* Submit Button */}
                     <Button

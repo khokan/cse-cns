@@ -59,7 +59,7 @@ const getJob = catchAsync(async (req: Request, res: Response) => {
     const userId = req.user!.userId;
     const userRole = req.user!.role;
 
-    const job = await ReportService.getJob(id, userId, userRole);
+    const job = await ReportService.getJob(id as string, userId, userRole);
 
     sendResponse(res, {
         httpStatusCode: status.OK,
@@ -78,7 +78,7 @@ const downloadReport = catchAsync(async (req: Request, res: Response) => {
     const userId = req.user!.userId;
     const userRole = req.user!.role;
 
-    const job = await ReportService.getJobForDownload(id, userId, userRole);
+    const job = await ReportService.getJobForDownload(id as string, userId, userRole);
 
     const ext = path.extname(job.filePath!).replace(".", "").toLowerCase();
     const mimeType = MIME_MAP[ext] ?? "application/octet-stream";
@@ -113,7 +113,7 @@ const cancelJob = catchAsync(async (req: Request, res: Response) => {
     const userId = req.user!.userId;
     const userRole = req.user!.role;
 
-    const result = await ReportService.deleteJob(id, userId, userRole);
+    const result = await ReportService.deleteJob(id as string, userId, userRole);
 
     sendResponse(res, {
         httpStatusCode: status.OK,

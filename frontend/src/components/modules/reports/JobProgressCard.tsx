@@ -4,7 +4,7 @@ import { FileText, Download, X, RefreshCw, AlertCircle, Clock, Loader2, CheckCir
 import { JobStatusBadge } from "./JobStatusBadge";
 import { FORMAT_COLORS, REPORT_TYPE_CONFIGS } from "@/constants/reportConstants";
 import { downloadReport } from "@/services/report.service";
-import { useCancelReportJob, useRequestReport } from "@/lib/hooks/useReportJobs";
+import { useCancelReportJob, useRequestReport } from "@/hooks/useReportJobs";
 import type { ReportJob } from "@/types/report.types";
 import { cn } from "@/utils/utils";
 import { toast } from "sonner";

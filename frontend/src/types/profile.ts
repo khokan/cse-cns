@@ -1,15 +1,15 @@
-export type StudentProfile = {
+export type trecholderProfile = {
   id: string;
   name: string;
   email: string;
-  role: "STUDENT" | "ADMIN";
+  role: "TRECHOLDER" | "ADMIN";
   status: "ACTIVE" | "BANNED";
   phone?: string | null;
   avatarUrl?: string | null;
   createdAt?: string;
 };
 
-export type UpdateStudentProfileInput = {
+export type UpdatetrecholderProfileInput = {
   name?: string;
   phone?: string | null;
   avatarUrl?: string | null;

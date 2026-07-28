@@ -69,11 +69,11 @@ export const AdminNavItems: NavSection[] = [
 
 export const TrecHolderNavItems: NavSection[] = [
     {
-        title: "subscriptions",
+        title: "trecholders",
         items: [
             {
-                title: "My subscriptions",
-                href: "/dashboard/subscription",
+                title: "My trecholders",
+                href: "/dashboard/trecholder",
                 icon: "Calendar",
             },
             {

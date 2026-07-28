@@ -11,7 +11,7 @@ interface Notification {
     id: string;
     title: string;
     message: string;
-    type : "subscription" | "schedule" | "system" | "user";
+    type : "trecholder" | "schedule" | "system" | "user";
     timestamp: Date;
     read : boolean;
 }
@@ -19,9 +19,9 @@ interface Notification {
 const MOCK_NOTIFICATIONS: Notification[] = [
     {
         id: "1",
-        title: "New Subscription Activated",
-        message: "You have successfully activated a new subscription with John Doe on 2024-06-15 at 10:00 AM.",
-        type : "subscription",
+        title: "New trecholder Activated",
+        message: "You have successfully activated a new trecholder with John Doe on 2024-06-15 at 10:00 AM.",
+        type : "trecholder",
         timestamp: new Date(Date.now() - 1000 * 60 * 30), // 30 minutes ago
         read : false
     },
@@ -56,7 +56,7 @@ const MOCK_NOTIFICATIONS: Notification[] = [
 
 const getNotificationIcon = (type : Notification["type"]) => {
     switch(type){
-        case "subscription":
+        case "trecholder":
             return <Calendar className="h-4 w-4 text-blue-600"/>
         case "schedule":
             return <Clock className="h-4 w-4 text-amber-600"/>

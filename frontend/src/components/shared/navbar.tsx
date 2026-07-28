@@ -2,7 +2,7 @@ import { userService } from "@/services/user.service";
 import { Roles } from "@/constants/roles";
 import NavbarContent from "./navbar-content";
 
-type Role = "STUDENT" | "ADMIN";
+type Role = "TRECHOLDER" | "ADMIN";
 type SessionUser = { name?: string; role?: Role };
 
 function linksForRole(role?: Role) {
@@ -12,7 +12,7 @@ function linksForRole(role?: Role) {
       { href: "/admin/dashboard", label: "Dashboard" },
     ];
   }
-  if (role === Roles.STUDENT) {
+  if (role === Roles.TRECHOLDER) {
     return [
       { href: "/", label: "Home" },
       { href: "/dashboard", label: "Dashboard" },

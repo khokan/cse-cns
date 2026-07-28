@@ -20,8 +20,7 @@ export interface BarChartData {
 }
 
 export interface IAdminDashboardData {
-    subscriptionCount : number;
-    studentCount : number;
+    trecholderCount : number;
     adminCount : number;
     superAdminCount : number;
     paymentCount : number;

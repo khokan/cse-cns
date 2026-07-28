@@ -31,7 +31,7 @@ export const superAdminProtectedRoutes : RouteConfig = {
     exact : []
 }
 
-export const studentProtectedRoutes : RouteConfig = {
+export const trecholderProtectedRoutes : RouteConfig = {
     pattern: [/^\/dashboard/ ], // Matches any path that starts with /dashboard
     exact : []
 };
@@ -52,7 +52,7 @@ export const getRouteOwner = (pathname : string) :  "ADMIN" | "TRECHHOLDER" | "C
         return "ADMIN";
     }
     
-    if(isRouteMatches(pathname, studentProtectedRoutes)) {
+    if(isRouteMatches(pathname, trecholderProtectedRoutes)) {
         return "TRECHHOLDER";
     }
 

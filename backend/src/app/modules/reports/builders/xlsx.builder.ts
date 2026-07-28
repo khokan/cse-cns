@@ -1,4 +1,4 @@
-import ExcelJS from "exceljs";
+import ExcelJS, { type CellValue } from "exceljs";
 import { ReportBuilder, BuildResult } from "./base.builder.js";
 
 // ---------------------------------------------------------------------------
@@ -77,7 +77,7 @@ export class XlsxBuilder extends ReportBuilder {
             headers.forEach((h, colIdx) => {
                 const cell = sheetRow.getCell(colIdx + 1);
                 const val = row[h];
-                cell.value = val instanceof Date ? val : (val ?? "");
+                cell.value = val instanceof Date ? val : ((val ?? "") as CellValue);
                 cell.alignment = { vertical: "middle", wrapText: false };
                 // Zebra stripes
                 if (rowIdx % 2 === 1) {

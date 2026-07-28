@@ -5,7 +5,7 @@ import { toast } from "sonner";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { getProfile, updateProfile } from "@/actions/student.action";
+import { getProfile, updateProfile } from "@/actions/trecholder.action";
 
 type Profile = {
   id: string;

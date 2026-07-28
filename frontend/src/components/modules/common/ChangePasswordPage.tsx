@@ -5,7 +5,7 @@ import { toast } from "sonner";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { changePassword } from "@/actions/student.action";
+import { changePassword } from "@/actions/trecholder.action";
 
 export default function ChangePasswordPage() {
   const [loading, setLoading] = useState(false);

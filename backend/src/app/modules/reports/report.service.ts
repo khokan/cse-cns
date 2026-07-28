@@ -8,6 +8,8 @@ import status from "http-status";
 import type {
     CreateReportJobDto,
     ReportJobQuery,
+    ReportType,
+    ReportStatus,
 } from "./report.interface.js";
 
 const MAX_ACTIVE_JOBS_PER_USER = 5;

@@ -1,11 +1,11 @@
 import type { AdminUser } from "@/components/modules/admin/AdminUsersTable";
 import AdminUsersTable from "@/components/modules/admin/AdminUsersTable";
-import { subscriptionService } from "@/services/subscription.service";
+import { trecholderService } from "@/services/trecholder.service";
 
 export const dynamic = "force-dynamic";
 
 export default async function UsersPage() {
-  const { data } = await subscriptionService.listUsers();
+  const { data } = await trecholderService.listUsers();
 
   const parsedUsers = (() => {
     if (!data) return [] as AdminUser[];
@@ -24,7 +24,7 @@ export default async function UsersPage() {
       <div>
         <h1 className="text-2xl font-semibold">User Management</h1>
         <p className="text-sm text-muted-foreground">
-          Review and manage registered users. Admins can view roles and subscription counts.
+          Review and manage registered users. Admins can view roles and trecholder counts.
         </p>
       </div>
 

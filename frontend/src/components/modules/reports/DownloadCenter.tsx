@@ -12,7 +12,7 @@ import {
 } from "lucide-react";
 import { JobProgressCard } from "./JobProgressCard";
 import { JobStatusBadge } from "./JobStatusBadge";
-import { useReportJobs, useDeleteAllReportJobs } from "@/lib/hooks/useReportJobs";
+import { useReportJobs, useDeleteAllReportJobs } from "@/hooks/useReportJobs";
 import type { ReportFormat, ReportStatus, ReportType } from "@/types/report.types";
 import { cn } from "@/utils/utils";
 import { useQueryClient } from "@tanstack/react-query";

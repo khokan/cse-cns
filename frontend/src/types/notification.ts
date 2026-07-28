@@ -1,5 +1,5 @@
 export type NotificationType =
-  | "subscription"
+  | "trecholder"
   | "schedule"
   | "system"
   | "user";

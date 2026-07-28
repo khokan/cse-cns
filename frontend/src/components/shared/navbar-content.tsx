@@ -10,7 +10,7 @@ import LogoutButton from "./logout-button";
 
 type NavbarUser = {
   name?: string;
-  role?: "STUDENT" | "ADMIN";
+  role?: "TRECHOLDER" | "ADMIN";
 };
 
 interface NavbarClientProps {
