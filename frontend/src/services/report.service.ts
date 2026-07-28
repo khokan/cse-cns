@@ -82,12 +82,30 @@ export const getReportJob = async (
 };
 
 // ---------------------------------------------------------------------------
-// DELETE /api/v1/reports/jobs/:id (cancel)
+// DELETE /api/v1/reports/jobs/:id (cancel/delete single)
 // ---------------------------------------------------------------------------
 export const cancelReportJob = async (
   id: string
 ): Promise<{ data: unknown | null; error: { message: string } | null }> => {
   return apiFetch(`/reports/jobs/${id}`, { method: "DELETE" });
+};
+
+// ---------------------------------------------------------------------------
+// DELETE /api/v1/reports/jobs (bulk delete all jobs for ADMIN)
+// ---------------------------------------------------------------------------
+export const deleteAllReportJobs = async (
+  params?: { reportType?: string; status?: string }
+): Promise<{ data: { count: number } | null; error: { message: string } | null }> => {
+  const qs = params
+    ? "?" +
+      new URLSearchParams(
+        Object.entries(params)
+          .filter(([, v]) => v != null && v !== "")
+          .map(([k, v]) => [k, String(v)])
+      ).toString()
+    : "";
+
+  return apiFetch(`/reports/jobs${qs}`, { method: "DELETE" });
 };
 
 // ---------------------------------------------------------------------------

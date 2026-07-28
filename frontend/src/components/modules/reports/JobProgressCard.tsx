@@ -1,6 +1,6 @@
 "use client";
 
-import { FileText, Download, X, RefreshCw, AlertCircle, Clock, Loader2, CheckCircle2 } from "lucide-react";
+import { FileText, Download, X, RefreshCw, AlertCircle, Clock, Loader2, CheckCircle2, Trash2 } from "lucide-react";
 import { JobStatusBadge } from "./JobStatusBadge";
 import { FORMAT_COLORS, REPORT_TYPE_CONFIGS } from "@/constants/reportConstants";
 import { downloadReport } from "@/services/report.service";
@@ -12,6 +12,7 @@ import { formatDistanceToNow } from "date-fns";
 
 interface JobProgressCardProps {
   job: ReportJob;
+  userRole?: string;
 }
 
 const STATUS_ICONS = {
@@ -22,10 +23,11 @@ const STATUS_ICONS = {
   CANCELLED: X,
 };
 
-export function JobProgressCard({ job }: JobProgressCardProps) {
+export function JobProgressCard({ job, userRole }: JobProgressCardProps) {
   const { mutate: cancelJob, isPending: isCancelling } = useCancelReportJob();
   const { mutate: retryJob, isPending: isRetrying } = useRequestReport();
 
+  const isAdmin = ["ADMIN", "IT"].includes(userRole ?? "");
   const typeConfig = REPORT_TYPE_CONFIGS.find((c) => c.id === job.reportType);
   const formatStyle = FORMAT_COLORS[job.format];
   const StatusIcon = STATUS_ICONS[job.status] ?? Clock;
@@ -37,9 +39,15 @@ export function JobProgressCard({ job }: JobProgressCardProps) {
     toast.success("Download started!");
   };
 
-  const handleCancel = () => {
+  const handleCancelOrDelete = () => {
     cancelJob(job.id, {
-      onSuccess: () => toast.success("Job cancelled."),
+      onSuccess: () => {
+        if (isAdmin) {
+          toast.success("Report job deleted permanently.");
+        } else {
+          toast.success("Report job cancelled.");
+        }
+      },
       onError: (err) => toast.error(err.message),
     });
   };
@@ -173,15 +181,28 @@ export function JobProgressCard({ job }: JobProgressCardProps) {
               </button>
             )}
 
-            {/* Cancel — PENDING or PROCESSING */}
-            {(job.status === "PENDING" || job.status === "PROCESSING") && (
+            {/* Cancel — available for TRECHOLDER when PENDING or PROCESSING, or for ADMIN always */}
+            {(job.status === "PENDING" || job.status === "PROCESSING") && !isAdmin && (
               <button
-                onClick={handleCancel}
+                onClick={handleCancelOrDelete}
                 disabled={isCancelling}
+                title="Cancel job"
                 className="flex items-center gap-1.5 rounded-lg bg-muted hover:bg-muted/80 text-muted-foreground hover:text-foreground px-3 py-1.5 text-xs font-medium transition-colors disabled:opacity-50"
               >
                 <X className={cn("w-3.5 h-3.5", isCancelling && "animate-spin")} />
                 Cancel
+              </button>
+            )}
+
+            {/* Delete — ADMIN only (can delete any job regardless of status) */}
+            {isAdmin && (
+              <button
+                onClick={handleCancelOrDelete}
+                disabled={isCancelling}
+                title="Delete report job and file"
+                className="flex items-center gap-1.5 rounded-lg bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 hover:bg-red-100 dark:hover:bg-red-900/40 px-2.5 py-1.5 text-xs font-medium transition-colors disabled:opacity-50"
+              >
+                <Trash2 className={cn("w-3.5 h-3.5", isCancelling && "animate-spin")} />
               </button>
             )}
           </div>

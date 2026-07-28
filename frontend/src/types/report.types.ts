@@ -54,6 +54,7 @@ export interface CreateReportJobPayload {
     // Tax certificate specific
     trecHolderId?: string;
     fiscalYear?: string;
+    isBulk?: boolean;
   };
 }
 

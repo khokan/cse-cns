@@ -1,6 +1,8 @@
 import { Download } from "lucide-react";
 import Link from "next/link";
 import { DownloadCenter } from "@/components/modules/reports/DownloadCenter";
+import { userService } from "@/services/user.service";
+import { redirect } from "next/navigation";
 import type { Metadata } from "next";
 
 export const metadata: Metadata = {
@@ -8,7 +10,14 @@ export const metadata: Metadata = {
   description: "Track and download your generated reports. Status updates in real-time.",
 };
 
-export default function DownloadCenterPage() {
+export const dynamic = "force-dynamic";
+
+export default async function DownloadCenterPage() {
+  const session = await userService.getSession();
+  if (!session?.data) redirect("/login");
+
+  const userRole = session.data.user.role as string;
+
   return (
     <div className="mx-auto max-w-3xl space-y-6 animate-fade-in">
       {/* Page header */}
@@ -34,7 +43,7 @@ export default function DownloadCenterPage() {
       </div>
 
       {/* Download Center client component with polling */}
-      <DownloadCenter />
+      <DownloadCenter userRole={userRole} />
     </div>
   );
 }

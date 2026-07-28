@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
-import { FileBarChart, Loader2, Filter } from "lucide-react";
+import { FileBarChart, Loader2, Filter, Users } from "lucide-react";
 import { ReportTypeSelector } from "./ReportTypeSelector";
 import { useRequestReport } from "@/lib/hooks/useReportJobs";
 import { REPORT_TYPE_CONFIGS } from "@/constants/reportConstants";
@@ -20,9 +20,16 @@ function getFiscalYearOptions(): string[] {
   return options.reverse();
 }
 
-export function ReportRequestForm() {
+interface ReportRequestFormProps {
+  userRole?: string;
+}
+
+export function ReportRequestForm({ userRole }: ReportRequestFormProps) {
   const router = useRouter();
   const { mutate: request, isPending } = useRequestReport();
+
+  const isAdmin = ["ADMIN", "IT"].includes(userRole ?? "");
+  const isTrecHolder = userRole === "TRECHOLDER";
 
   // Form state
   const [reportType, setReportType] = useState<ReportType>("trec_holder_tax_certificate");
@@ -32,22 +39,19 @@ export function ReportRequestForm() {
   const [memberCode, setMemberCode] = useState("");
   const [region, setRegion] = useState("");
   const [search, setSearch] = useState("");
-  // Tax certificate specific
   const [trecHolderId, setTrecHolderId] = useState("");
   const [fiscalYear, setFiscalYear] = useState("2024-2025");
 
   const config = REPORT_TYPE_CONFIGS.find((c) => c.id === reportType)!;
 
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-
-    if (config.hasTrecHolderFilter && !trecHolderId.trim()) {
-      toast.error("Please enter a TREC Holder ID or Member Code.");
+  const handleGenerate = (isBulk: boolean = false) => {
+    if (config.hasFiscalYearFilter && !fiscalYear.trim()) {
+      toast.error("Please select a Fiscal Year.");
       return;
     }
 
-    if (config.hasFiscalYearFilter && !fiscalYear.trim()) {
-      toast.error("Please select a Fiscal Year.");
+    if (!isBulk && isAdmin && config.hasTrecHolderFilter && !trecHolderId.trim() && !memberCode.trim()) {
+      toast.error("Please enter a Member Code / TREC Holder ID, or click 'Generate for All Members'.");
       return;
     }
 
@@ -59,14 +63,19 @@ export function ReportRequestForm() {
       ...(config.hasSearchFilter && search ? { search } : {}),
       ...(config.hasTrecHolderFilter && trecHolderId ? { trecHolderId: trecHolderId.trim() } : {}),
       ...(config.hasFiscalYearFilter && fiscalYear ? { fiscalYear } : {}),
+      ...(isBulk ? { isBulk: true } : {}),
     };
 
     request(
       { reportType, format, filters },
       {
         onSuccess: () => {
-          toast.success("Report queued!", {
-            description: `Your ${config.label} (${format}) is being generated.`,
+          const description = isBulk
+            ? `Batch report generation queued for all members in the Member table.`
+            : `Your ${config.label} (${format}) is being generated.`;
+
+          toast.success(isBulk ? "Batch Reports Queued!" : "Report Queued!", {
+            description,
             action: {
               label: "View Progress",
               onClick: () => router.push("/reports/download-center"),
@@ -90,7 +99,7 @@ export function ReportRequestForm() {
     config.hasFiscalYearFilter;
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-8">
+    <form onSubmit={(e) => e.preventDefault()} className="space-y-8">
       {/* Section: Report type + format */}
       <div className="rounded-2xl border bg-card p-6 shadow-sm">
         <div className="mb-5 flex items-center gap-2">
@@ -179,26 +188,27 @@ export function ReportRequestForm() {
             )}
 
             {/* ---- Tax Certificate specific filters ---- */}
-            {config.hasTrecHolderFilter && (
-              <div className="space-y-1.5">
+            {/* For ADMIN: optional member code / trec holder id input */}
+            {config.hasTrecHolderFilter && isAdmin && (
+              <div className="space-y-1.5 sm:col-span-2">
                 <label className={labelClass}>
-                  TREC Holder ID / Member Code
-                  <span className="ml-1 text-red-500">*</span>
+                  Member Code / TREC Holder ID
+                  <span className="ml-1 text-xs text-muted-foreground font-normal">(optional — leave blank when generating for all members)</span>
                 </label>
                 <input
                   id="trecHolderId"
                   type="text"
-                  placeholder="e.g. 121001"
+                  placeholder="e.g. 121001 (leave blank to batch generate for all members)"
                   value={trecHolderId}
                   onChange={(e) => setTrecHolderId(e.target.value)}
-                  required
                   className={inputClass}
                 />
               </div>
             )}
 
+            {/* Fiscal Year dropdown — shown for both roles */}
             {config.hasFiscalYearFilter && (
-              <div className="space-y-1.5">
+              <div className="space-y-1.5 sm:col-span-2">
                 <label className={labelClass}>
                   Fiscal Year
                   <span className="ml-1 text-red-500">*</span>
@@ -222,16 +232,42 @@ export function ReportRequestForm() {
         </div>
       )}
 
-      {/* Submit */}
-      <div className="flex justify-end">
+      {/* Submit buttons */}
+      <div className="flex flex-wrap items-center justify-end gap-3">
+        {isAdmin && reportType === "trec_holder_tax_certificate" && (
+          <button
+            type="button"
+            onClick={() => handleGenerate(true)}
+            disabled={isPending}
+            className={cn(
+              "inline-flex items-center gap-2 rounded-xl px-6 py-3 text-sm font-semibold transition-all duration-200",
+              "bg-emerald-600 text-white shadow-sm hover:bg-emerald-700 hover:shadow-md hover:-translate-y-0.5",
+              "disabled:opacity-60 disabled:cursor-not-allowed"
+            )}
+          >
+            {isPending ? (
+              <>
+                <Loader2 className="w-4 h-4 animate-spin" />
+                Generating for All Members...
+              </>
+            ) : (
+              <>
+                <Users className="w-4 h-4" />
+                Generate for All Members (Single Click)
+              </>
+            )}
+          </button>
+        )}
+
         <button
-          type="submit"
+          type="button"
+          onClick={() => handleGenerate(false)}
           disabled={isPending}
           className={cn(
             "inline-flex items-center gap-2 rounded-xl px-8 py-3 text-sm font-semibold transition-all duration-200",
             "bg-primary text-primary-foreground shadow-sm",
             "hover:bg-primary/90 hover:shadow-md hover:-translate-y-0.5",
-            "disabled:opacity-60 disabled:cursor-not-allowed disabled:translate-y-0 disabled:shadow-sm"
+            "disabled:opacity-60 disabled:cursor-not-allowed"
           )}
         >
           {isPending ? (
@@ -242,7 +278,7 @@ export function ReportRequestForm() {
           ) : (
             <>
               <FileBarChart className="w-4 h-4" />
-              Generate {format} Report
+              {isTrecHolder ? `Generate ${format} Report` : `Generate Individual Report (${format})`}
             </>
           )}
         </button>

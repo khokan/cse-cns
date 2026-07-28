@@ -93,3 +93,21 @@ export const useCancelReportJob = () => {
     },
   });
 };
+
+// ---------------------------------------------------------------------------
+// Mutation: bulk delete all jobs for ADMIN
+// ---------------------------------------------------------------------------
+export const useDeleteAllReportJobs = () => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (params?: { reportType?: string; status?: string }) => {
+      const { deleteAllReportJobs } = await import("@/services/report.service");
+      const { data, error } = await deleteAllReportJobs(params);
+      if (error) throw new Error(error.message);
+      return data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["report-jobs"] });
+    },
+  });
+};

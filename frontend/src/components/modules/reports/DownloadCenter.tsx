@@ -8,13 +8,15 @@ import {
   Loader2,
   ChevronLeft,
   ChevronRight,
+  Trash2,
 } from "lucide-react";
 import { JobProgressCard } from "./JobProgressCard";
 import { JobStatusBadge } from "./JobStatusBadge";
-import { useReportJobs } from "@/lib/hooks/useReportJobs";
+import { useReportJobs, useDeleteAllReportJobs } from "@/lib/hooks/useReportJobs";
 import type { ReportFormat, ReportStatus, ReportType } from "@/types/report.types";
 import { cn } from "@/utils/utils";
 import { useQueryClient } from "@tanstack/react-query";
+import { toast } from "sonner";
 
 // Status filter tabs
 const STATUS_TABS: { label: string; value: ReportStatus | "ALL" }[] = [
@@ -25,15 +27,24 @@ const STATUS_TABS: { label: string; value: ReportStatus | "ALL" }[] = [
   { label: "Failed", value: "FAILED" },
 ];
 
-export function DownloadCenter() {
+interface DownloadCenterProps {
+  userRole: string;
+}
+
+export function DownloadCenter({ userRole }: DownloadCenterProps) {
   const queryClient = useQueryClient();
   const [statusFilter, setStatusFilter] = useState<ReportStatus | "ALL">("ALL");
   const [page, setPage] = useState(1);
   const LIMIT = 10;
 
+  const isAdmin = ["ADMIN", "IT"].includes(userRole);
+  const { mutate: deleteAll, isPending: isDeletingAll } = useDeleteAllReportJobs();
+
   const params = {
     page,
     limit: LIMIT,
+    // Admin sees ALL users' reports; TRECHOLDER only sees their own
+    ...(isAdmin ? { all: true } : {}),
     ...(statusFilter !== "ALL" ? { status: statusFilter } : {}),
   };
 
@@ -47,6 +58,25 @@ export function DownloadCenter() {
     queryClient.invalidateQueries({ queryKey: ["report-jobs"] });
   };
 
+  const handleDeleteAll = () => {
+    const filterLabel = statusFilter === "ALL" ? "ALL" : statusFilter;
+    const confirmMsg = `Are you sure you want to permanently DELETE ALL ${filterLabel} report jobs and their files for all TREC Holders? This action cannot be undone.`;
+
+    if (!window.confirm(confirmMsg)) return;
+
+    deleteAll(
+      { status: statusFilter !== "ALL" ? statusFilter : undefined },
+      {
+        onSuccess: (res) => {
+          toast.success(`Deleted ${res?.count ?? 0} report job(s) and associated file(s).`);
+        },
+        onError: (err) => {
+          toast.error("Failed to delete reports", { description: err.message });
+        },
+      }
+    );
+  };
+
   return (
     <div className="space-y-6">
       {/* Header bar */}
@@ -58,20 +88,42 @@ export function DownloadCenter() {
             {meta && (
               <p className="text-xs text-muted-foreground">
                 {meta.total} job{meta.total !== 1 ? "s" : ""} total
+                {isAdmin && (
+                  <span className="ml-1 text-primary/70">(all TREC Holders)</span>
+                )}
               </p>
             )}
           </div>
         </div>
 
-        {/* Refresh button */}
-        <button
-          onClick={handleRefresh}
-          disabled={isFetching}
-          className="inline-flex items-center gap-2 rounded-xl border border-border bg-card px-3 py-2 text-xs font-medium text-muted-foreground hover:bg-accent/50 transition-colors disabled:opacity-50"
-        >
-          <RefreshCw className={cn("w-3.5 h-3.5", isFetching && "animate-spin")} />
-          Refresh
-        </button>
+        {/* Header action buttons */}
+        <div className="flex items-center gap-2">
+          {/* Delete All button — ADMIN only */}
+          {isAdmin && (
+            <button
+              onClick={handleDeleteAll}
+              disabled={isDeletingAll || (meta?.total ?? 0) === 0}
+              className="inline-flex items-center gap-2 rounded-xl bg-red-600 hover:bg-red-700 text-white px-3 py-2 text-xs font-semibold shadow-xs transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+            >
+              {isDeletingAll ? (
+                <Loader2 className="w-3.5 h-3.5 animate-spin" />
+              ) : (
+                <Trash2 className="w-3.5 h-3.5" />
+              )}
+              Delete All Reports
+            </button>
+          )}
+
+          {/* Refresh button */}
+          <button
+            onClick={handleRefresh}
+            disabled={isFetching}
+            className="inline-flex items-center gap-2 rounded-xl border border-border bg-card px-3 py-2 text-xs font-medium text-muted-foreground hover:bg-accent/50 transition-colors disabled:opacity-50"
+          >
+            <RefreshCw className={cn("w-3.5 h-3.5", isFetching && "animate-spin")} />
+            Refresh
+          </button>
+        </div>
       </div>
 
       {/* Status filter tabs */}
@@ -145,7 +197,7 @@ export function DownloadCenter() {
       {!isLoading && jobs.length > 0 && (
         <div className="space-y-3">
           {jobs.map((job) => (
-            <JobProgressCard key={job.id} job={job} />
+            <JobProgressCard key={job.id} job={job} userRole={userRole} />
           ))}
         </div>
       )}

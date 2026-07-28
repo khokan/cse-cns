@@ -1,6 +1,8 @@
 import { FileBarChart } from "lucide-react";
 import Link from "next/link";
 import { ReportRequestForm } from "@/components/modules/reports/ReportRequestForm";
+import { userService } from "@/services/user.service";
+import { redirect } from "next/navigation";
 import type { Metadata } from "next";
 
 export const metadata: Metadata = {
@@ -8,7 +10,14 @@ export const metadata: Metadata = {
   description: "Select a report type, apply filters, and generate PDF, XLSX, or CSV reports.",
 };
 
-export default function ReportsPage() {
+export const dynamic = "force-dynamic";
+
+export default async function ReportsPage() {
+  const session = await userService.getSession();
+  if (!session?.data) redirect("/login");
+
+  const userRole = session.data.user.role as string;
+
   return (
     <div className="mx-auto max-w-3xl space-y-6 animate-fade-in">
       {/* Page header */}
@@ -34,7 +43,7 @@ export default function ReportsPage() {
       </div>
 
       {/* Form */}
-      <ReportRequestForm />
+      <ReportRequestForm userRole={userRole} />
     </div>
   );
 }
