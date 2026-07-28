@@ -35,6 +35,12 @@ const requestReport = async (
     }
 
     const queueJobId = uuidv4();
+    const filters = dto.filters ?? {};
+
+    // For tax certificates, default trecHolderId to the requesting user's ID if not explicitly specified
+    if (dto.reportType === "trec_holder_tax_certificate" && !filters.trecHolderId) {
+        filters.trecHolderId = userId;
+    }
 
     // Create DB record
     const reportJob = await db.cnsWeb.reportJob.create({
@@ -42,7 +48,7 @@ const requestReport = async (
             userId,
             reportType: dto.reportType,
             format: dto.format,
-            filters: dto.filters ? JSON.stringify(dto.filters) : null,
+            filters: Object.keys(filters).length > 0 ? JSON.stringify(filters) : null,
             status: "PENDING",
             queueJobId,
         },
@@ -55,7 +61,7 @@ const requestReport = async (
             userId,
             reportType: dto.reportType,
             format: dto.format,
-            filters: dto.filters ?? {},
+            filters,
         });
     });
 

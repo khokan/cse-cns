@@ -15,7 +15,8 @@ export type ReportType =
     | "member_list"
     | "trec_holder_summary"
     | "user_activity"
-    | "financial_summary";
+    | "financial_summary"
+    | "trec_holder_tax_certificate";
 
 // ---------------------------------------------------------------------------
 // Filter shapes per report type
@@ -27,6 +28,9 @@ export interface ReportFilters {
     region?: string;
     userId?: string;
     search?: string;
+    // Tax certificate specific
+    trecHolderId?: string;  // UUID of TrecHolder in CNSWeb DB
+    fiscalYear?: string;    // e.g. "2025-2026" — passed directly to USP_Certificate_Show
 }
 
 // ---------------------------------------------------------------------------

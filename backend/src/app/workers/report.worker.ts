@@ -3,12 +3,20 @@ import { storageLib } from "../lib/storage.js";
 import { CsvBuilder } from "../modules/reports/builders/csv.builder.js";
 import { XlsxBuilder } from "../modules/reports/builders/xlsx.builder.js";
 import { PdfBuilder } from "../modules/reports/builders/pdf.builder.js";
+import { TaxCertificatePdfBuilder } from "../modules/reports/builders/tax-certificate.pdf.builder.js";
+import { TaxCertificateXlsxBuilder } from "../modules/reports/builders/tax-certificate.xlsx.builder.js";
+import { TaxCertificateCsvBuilder } from "../modules/reports/builders/tax-certificate.csv.builder.js";
 import type { ReportJobPayload, ReportFormat } from "../modules/reports/report.interface.js";
 import type { ReportBuilder } from "../modules/reports/builders/base.builder.js";
+import type {
+    SpRawRow,
+    TaxCertificateData,
+    CollectionRow,
+    ChallanRow,
+} from "../modules/reports/builders/tax-certificate.types.js";
 
 // ---------------------------------------------------------------------------
 // DATA FETCHERS — one function per reportType
-// Each fetcher returns an array of plain objects ready for the builders.
 // ---------------------------------------------------------------------------
 
 const REPORT_TITLES: Record<string, string> = {
@@ -16,6 +24,7 @@ const REPORT_TITLES: Record<string, string> = {
     trec_holder_summary: "TrecHolder Summary Report",
     user_activity: "User Activity Report",
     financial_summary: "Financial Summary Report",
+    trec_holder_tax_certificate: "Certificate of Collection of Tax",
 };
 
 type Filters = Record<string, unknown>;
@@ -94,7 +103,6 @@ async function fetchUserActivity(filters: Filters): Promise<Record<string, unkno
 }
 
 async function fetchFinancialSummary(filters: Filters): Promise<Record<string, unknown>[]> {
-    // Financial report aggregates member bank/account data from CNS
     const members = await db.cnsWeb.member.findMany({
         where: {
             NOT: { AccountCode: null },
@@ -117,19 +125,228 @@ async function fetchFinancialSummary(filters: Filters): Promise<Record<string, u
 }
 
 // ---------------------------------------------------------------------------
+// Tax Certificate — calls USP_Certificate_Show
+//
+// SP Signature:
+//   EXEC [dbo].[USP_Certificate_Show] @FromDate DATETIME, @ToDate DATETIME, @MemberID VARCHAR(20)
+//
+// Returns ONE flat result set — header info is repeated on every row.
+//   ReferenceNumber, FromDate, ToDate, MemberName, MemberID, MemberAddress,
+//   Month, [Challan Number], [Challan Date], [Trade Volume],
+//   [Total Amount in Challan], [Amount Relating to this Certificate], BankBranch
+//
+// Filters used:
+//   trecHolderId — UUID of the TrecHolder in CNSWeb (used to resolve MemberID)
+//   fiscalYear   — e.g. "2024-2025" → FromDate = 01-Jul-YYYY, ToDate = 30-Jun-YYYY+1
+//
+// If trecHolderId is absent (ADMIN shortcut) memberCode is used directly.
+// ---------------------------------------------------------------------------
+
+/** Convert fiscal year string "YYYY-YYYY+1" → { fromDate, toDate } in MSSQL-compatible format */
+function fiscalYearToDates(fiscalYear: string): { fromDate: string; toDate: string } {
+    const [startYear] = fiscalYear.split("-").map(Number);
+    if (!startYear || isNaN(startYear)) {
+        throw new Error(`Invalid fiscalYear format: "${fiscalYear}". Expected e.g. "2024-2025".`);
+    }
+    return {
+        fromDate: `01-Jul-${startYear}`,
+        toDate: `30-Jun-${startYear + 1}`,
+    };
+}
+
+/** Format a raw decimal/number from the SP to a comma-separated string */
+function fmtDecimal(raw: string | number | null | undefined): string {
+    if (raw == null || raw === "") return "0.00";
+    const num = typeof raw === "string" ? parseFloat(raw) : raw;
+    if (isNaN(num)) return "0.00";
+    return num.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
+
+/** Format a DateTime from the SP to "dd.mm.yy" e.g. "14.08.25" */
+function fmtChallanDate(raw: Date | string | null | undefined): string {
+    if (!raw) return "";
+    const d = raw instanceof Date ? raw : new Date(raw);
+    if (isNaN(d.getTime())) return String(raw);
+    const dd = String(d.getDate()).padStart(2, "0");
+    const mm = String(d.getMonth() + 1).padStart(2, "0");
+    const yy = String(d.getFullYear()).slice(-2);
+    return `${dd}.${mm}.${yy}`;
+}
+
+/** Format today's date as "DD-Mon-YYYY" e.g. "21-Jul-2026" */
+function fmtIssueDate(): string {
+    const d = new Date();
+    const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+    const dd = String(d.getDate()).padStart(2, "0");
+    return `${dd}-${MONTHS[d.getMonth()]}-${d.getFullYear()}`;
+}
+
+async function fetchTaxCertificate(filters: Filters): Promise<Record<string, unknown>[]> {
+    const fiscalYear = (filters.fiscalYear as string | undefined) ?? "";
+    const trecHolderId = (filters.trecHolderId as string | undefined) ?? "";
+    // ADMIN may also pass memberCode directly (e.g. "121001")
+    const memberCodeDirect = (filters.memberCode as string | undefined) ?? "";
+
+    if (!fiscalYear) {
+        throw new Error("fiscalYear filter is required for the tax certificate report (e.g. \"2024-2025\").");
+    }
+    if (!trecHolderId && !memberCodeDirect) {
+        throw new Error("Either trecHolderId or memberCode filter is required for the tax certificate report.");
+    }
+
+    // -----------------------------------------------------------------------
+    // 1. Resolve MemberID
+    // -----------------------------------------------------------------------
+    let memberId = memberCodeDirect;
+    let tin = "";
+
+    if (trecHolderId) {
+        const trecHolder = await db.cnsWeb.trecHolder.findUnique({
+            where: { id: trecHolderId },
+        });
+        if (!trecHolder) {
+            throw new Error(`TrecHolder with ID "${trecHolderId}" not found.`);
+        }
+
+        // Resolve MemberID via email match on CNSWeb Member table
+        const member = await db.cnsWeb.member.findFirst({
+            where: { MemberID: trecHolder.id },
+        });
+
+        if (!member) {
+            throw new Error(`No Member record found for TrecHolder email "${trecHolder.email}".`);
+        }
+
+        memberId = member.MemberID;
+        tin = member.TIN ?? "";
+    } else {
+        // ADMIN passed memberCode directly — look up TIN from CNSWeb
+        const member = await db.cnsWeb.member.findFirst({
+            where: { MemberCode: memberCodeDirect },
+        });
+        tin = member?.TIN ?? "";
+        if (!memberId) memberId = member?.MemberID ?? memberCodeDirect;
+    }
+
+    // -----------------------------------------------------------------------
+    // 2. Convert fiscal year → MSSQL date strings
+    // -----------------------------------------------------------------------
+    const { fromDate, toDate } = fiscalYearToDates(fiscalYear);
+
+    // -----------------------------------------------------------------------
+    // 3. Execute stored procedure
+    //    EXEC [dbo].[USP_Certificate_Show] @FromDate = '...', @ToDate = '...', @MemberID = '...'
+    // -----------------------------------------------------------------------
+    console.log(`📋 [TaxCert] Calling USP_Certificate_Show | MemberID=${memberId} | ${fromDate} → ${toDate}`);
+
+    const rows = await db.cns.$queryRawUnsafe<SpRawRow[]>(
+        `EXEC [dbo].[USP_Certificate_Show] @FromDate = '${fromDate}', @ToDate = '${toDate}', @MemberID = '${memberId}'`
+    );
+
+    if (!rows || rows.length === 0) {
+        throw new Error(
+            `USP_Certificate_Show returned no data for MemberID="${memberId}", ${fromDate} → ${toDate}.`
+        );
+    }
+
+    // -----------------------------------------------------------------------
+    // 4. Extract header from first row (repeated on every row)
+    // -----------------------------------------------------------------------
+    const firstRow = rows[0];
+    const referenceNumber = firstRow.ReferenceNumber ?? `CSE/TRECHolderTax/${fiscalYear}`;
+    const memberName = (firstRow.MemberName ?? "").replace(/\.$/, "").trim(); // strip trailing dot
+    const memberAddress = (firstRow.MemberAddress ?? "").trim();
+
+    // Use TIN from CNSWeb Member; fallback to empty if not found
+    // (SP does not return TIN — it must come from the Member table)
+
+    // -----------------------------------------------------------------------
+    // 5. Build Section 04 — group rows by Month and sum volumes
+    // -----------------------------------------------------------------------
+    const monthMap = new Map<string, { tradeVolume: number; incomeTax: number }>();
+
+    for (const row of rows) {
+        const month = (row.Month ?? "").trim();
+        if (!month) continue;
+
+        const tv = parseFloat(String(row["Trade Volume"] ?? "0")) || 0;
+        const arc = parseFloat(String(row["Amount Relating to this Certificate"] ?? "0")) || 0;
+
+        if (monthMap.has(month)) {
+            const existing = monthMap.get(month)!;
+            existing.tradeVolume += tv;
+            existing.incomeTax += arc;
+        } else {
+            monthMap.set(month, { tradeVolume: tv, incomeTax: arc });
+        }
+    }
+
+    // Preserve insertion order (SP already returns data in date order)
+    const collectionRows: CollectionRow[] = Array.from(monthMap.entries()).map(
+        ([monthLabel, totals], idx) => ({
+            sl: idx + 1,
+            monthLabel,
+            description: "Collection of Tax",
+            section: "137",
+            tradeVolume: fmtDecimal(totals.tradeVolume),
+            incomeTax: fmtDecimal(totals.incomeTax),
+        })
+    );
+
+    // -----------------------------------------------------------------------
+    // 6. Build Section 05 — one challan row per SP row
+    // -----------------------------------------------------------------------
+    const challanRows: ChallanRow[] = rows.map((row, idx) => ({
+        sl: idx + 1,
+        challanNumber: (row["Challan Number"] ?? "").trim(),
+        challanDate: fmtChallanDate(row["Challan Date"]),
+        month: (row.Month ?? "").trim(),
+        bankBranch: (row.BankBranch ?? "").trim(),
+        totalAmount: fmtDecimal(row["Total Amount in Challan"]),
+    }));
+
+    // -----------------------------------------------------------------------
+    // 7. Assemble the final typed payload
+    // -----------------------------------------------------------------------
+    const certData: TaxCertificateData = {
+        referenceNumber,
+        issueDate: fmtIssueDate(),
+        fromDate,
+        toDate,
+        trecHolder: {
+            name: memberName,
+            address: memberAddress,
+            tin,
+        },
+        collectionRows,
+        challanRows,
+    };
+
+    // Pack into the single-element array convention used by all builders
+    return [certData as unknown as Record<string, unknown>];
+}
+
+// ---------------------------------------------------------------------------
 // Builder factory
 // ---------------------------------------------------------------------------
 
-function createBuilder(format: ReportFormat, title: string): ReportBuilder {
+const TAX_CERT = "trec_holder_tax_certificate";
+
+function createBuilder(reportType: string, format: ReportFormat, title: string): ReportBuilder {
+    if (reportType === TAX_CERT) {
+        switch (format) {
+            case "PDF": return new TaxCertificatePdfBuilder();
+            case "XLSX": return new TaxCertificateXlsxBuilder();
+            case "CSV": return new TaxCertificateCsvBuilder();
+            default: throw new Error(`Unsupported format for tax certificate: ${format}`);
+        }
+    }
+
     switch (format) {
-        case "CSV":
-            return new CsvBuilder(title);
-        case "XLSX":
-            return new XlsxBuilder(title);
-        case "PDF":
-            return new PdfBuilder(title);
-        default:
-            throw new Error(`Unsupported format: ${format}`);
+        case "CSV": return new CsvBuilder(title);
+        case "XLSX": return new XlsxBuilder(title);
+        case "PDF": return new PdfBuilder(title);
+        default: throw new Error(`Unsupported format: ${format}`);
     }
 }
 
@@ -142,16 +359,12 @@ async function fetchData(
     filters: Filters
 ): Promise<Record<string, unknown>[]> {
     switch (reportType) {
-        case "member_list":
-            return fetchMemberList(filters);
-        case "trec_holder_summary":
-            return fetchTrecHolderSummary(filters);
-        case "user_activity":
-            return fetchUserActivity(filters);
-        case "financial_summary":
-            return fetchFinancialSummary(filters);
-        default:
-            throw new Error(`Unknown report type: ${reportType}`);
+        case "member_list": return fetchMemberList(filters);
+        case "trec_holder_summary": return fetchTrecHolderSummary(filters);
+        case "user_activity": return fetchUserActivity(filters);
+        case "financial_summary": return fetchFinancialSummary(filters);
+        case TAX_CERT: return fetchTaxCertificate(filters);
+        default: throw new Error(`Unknown report type: ${reportType}`);
     }
 }
 
@@ -176,7 +389,7 @@ export async function processReportJob(payload: ReportJobPayload): Promise<void>
 
         // 2. Build the report file
         const title = REPORT_TITLES[reportType] ?? "Report";
-        const builder = createBuilder(format, title);
+        const builder = createBuilder(reportType, format, title);
         const { buffer, extension } = await builder.generate(data, filters as Filters);
 
         // 3. Save to local disk
