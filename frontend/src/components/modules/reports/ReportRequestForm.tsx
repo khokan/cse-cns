@@ -10,23 +10,46 @@ import { REPORT_TYPE_CONFIGS } from "@/constants/reportConstants";
 import type { ReportFormat, ReportType } from "@/types/report.types";
 import { cn } from "@/utils/utils";
 
+// Generate fiscal year options: e.g. "2024-2025", "2025-2026"
+function getFiscalYearOptions(): string[] {
+  const currentYear = new Date().getFullYear();
+  const options: string[] = [];
+  for (let y = currentYear - 3; y <= currentYear + 1; y++) {
+    options.push(`${y}-${y + 1}`);
+  }
+  return options.reverse();
+}
+
 export function ReportRequestForm() {
   const router = useRouter();
   const { mutate: request, isPending } = useRequestReport();
 
   // Form state
-  const [reportType, setReportType] = useState<ReportType>("member_list");
-  const [format, setFormat] = useState<ReportFormat>("XLSX");
+  const [reportType, setReportType] = useState<ReportType>("trec_holder_tax_certificate");
+  const [format, setFormat] = useState<ReportFormat>("PDF");
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
   const [memberCode, setMemberCode] = useState("");
   const [region, setRegion] = useState("");
   const [search, setSearch] = useState("");
+  // Tax certificate specific
+  const [trecHolderId, setTrecHolderId] = useState("");
+  const [fiscalYear, setFiscalYear] = useState("2024-2025");
 
   const config = REPORT_TYPE_CONFIGS.find((c) => c.id === reportType)!;
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+
+    if (config.hasTrecHolderFilter && !trecHolderId.trim()) {
+      toast.error("Please enter a TREC Holder ID or Member Code.");
+      return;
+    }
+
+    if (config.hasFiscalYearFilter && !fiscalYear.trim()) {
+      toast.error("Please select a Fiscal Year.");
+      return;
+    }
 
     const filters = {
       ...(config.hasDateFilter && dateFrom ? { dateFrom } : {}),
@@ -34,12 +57,14 @@ export function ReportRequestForm() {
       ...(config.hasMemberCodeFilter && memberCode ? { memberCode } : {}),
       ...(config.hasRegionFilter && region ? { region } : {}),
       ...(config.hasSearchFilter && search ? { search } : {}),
+      ...(config.hasTrecHolderFilter && trecHolderId ? { trecHolderId: trecHolderId.trim() } : {}),
+      ...(config.hasFiscalYearFilter && fiscalYear ? { fiscalYear } : {}),
     };
 
     request(
       { reportType, format, filters },
       {
-        onSuccess: (data) => {
+        onSuccess: () => {
           toast.success("Report queued!", {
             description: `Your ${config.label} (${format}) is being generated.`,
             action: {
@@ -55,6 +80,14 @@ export function ReportRequestForm() {
       }
     );
   };
+
+  const hasFilters =
+    config.hasDateFilter ||
+    config.hasMemberCodeFilter ||
+    config.hasRegionFilter ||
+    config.hasSearchFilter ||
+    config.hasTrecHolderFilter ||
+    config.hasFiscalYearFilter;
 
   return (
     <form onSubmit={handleSubmit} className="space-y-8">
@@ -73,24 +106,18 @@ export function ReportRequestForm() {
       </div>
 
       {/* Section: Filters (contextual) */}
-      {(config.hasDateFilter ||
-        config.hasMemberCodeFilter ||
-        config.hasRegionFilter ||
-        config.hasSearchFilter) && (
+      {hasFilters && (
         <div className="rounded-2xl border bg-card p-6 shadow-sm">
           <div className="mb-5 flex items-center gap-2">
             <Filter className="w-5 h-5 text-primary" />
             <h2 className="text-base font-semibold">Filters</h2>
-            <span className="text-xs text-muted-foreground">(optional)</span>
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             {config.hasDateFilter && (
               <>
                 <div className="space-y-1.5">
-                  <label className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
-                    From Date
-                  </label>
+                  <label className={labelClass}>From Date</label>
                   <input
                     type="date"
                     value={dateFrom}
@@ -100,9 +127,7 @@ export function ReportRequestForm() {
                   />
                 </div>
                 <div className="space-y-1.5">
-                  <label className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
-                    To Date
-                  </label>
+                  <label className={labelClass}>To Date</label>
                   <input
                     type="date"
                     value={dateTo}
@@ -116,9 +141,7 @@ export function ReportRequestForm() {
 
             {config.hasMemberCodeFilter && (
               <div className="space-y-1.5">
-                <label className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
-                  Member Code
-                </label>
+                <label className={labelClass}>Member Code</label>
                 <input
                   type="text"
                   placeholder="e.g. MEM001"
@@ -131,9 +154,7 @@ export function ReportRequestForm() {
 
             {config.hasRegionFilter && (
               <div className="space-y-1.5">
-                <label className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
-                  Region
-                </label>
+                <label className={labelClass}>Region</label>
                 <input
                   type="text"
                   placeholder="Clearing region ID"
@@ -146,9 +167,7 @@ export function ReportRequestForm() {
 
             {config.hasSearchFilter && (
               <div className="space-y-1.5 sm:col-span-2">
-                <label className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
-                  Search
-                </label>
+                <label className={labelClass}>Search</label>
                 <input
                   type="text"
                   placeholder="Name or email..."
@@ -156,6 +175,47 @@ export function ReportRequestForm() {
                   onChange={(e) => setSearch(e.target.value)}
                   className={inputClass}
                 />
+              </div>
+            )}
+
+            {/* ---- Tax Certificate specific filters ---- */}
+            {config.hasTrecHolderFilter && (
+              <div className="space-y-1.5">
+                <label className={labelClass}>
+                  TREC Holder ID / Member Code
+                  <span className="ml-1 text-red-500">*</span>
+                </label>
+                <input
+                  id="trecHolderId"
+                  type="text"
+                  placeholder="e.g. 121001"
+                  value={trecHolderId}
+                  onChange={(e) => setTrecHolderId(e.target.value)}
+                  required
+                  className={inputClass}
+                />
+              </div>
+            )}
+
+            {config.hasFiscalYearFilter && (
+              <div className="space-y-1.5">
+                <label className={labelClass}>
+                  Fiscal Year
+                  <span className="ml-1 text-red-500">*</span>
+                </label>
+                <select
+                  id="fiscalYear"
+                  value={fiscalYear}
+                  onChange={(e) => setFiscalYear(e.target.value)}
+                  required
+                  className={inputClass}
+                >
+                  {getFiscalYearOptions().map((fy) => (
+                    <option key={fy} value={fy}>
+                      {fy}
+                    </option>
+                  ))}
+                </select>
               </div>
             )}
           </div>
@@ -190,6 +250,9 @@ export function ReportRequestForm() {
     </form>
   );
 }
+
+const labelClass =
+  "text-xs font-medium text-muted-foreground uppercase tracking-wide";
 
 const inputClass =
   "w-full rounded-xl border border-border bg-background px-3 py-2.5 text-sm text-foreground placeholder:text-muted-foreground focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary/30 transition-colors";

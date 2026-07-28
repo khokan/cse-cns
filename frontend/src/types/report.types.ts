@@ -15,7 +15,8 @@ export type ReportType =
   | "member_list"
   | "trec_holder_summary"
   | "user_activity"
-  | "financial_summary";
+  | "financial_summary"
+  | "trec_holder_tax_certificate";
 
 // ---------------------------------------------------------------------------
 // API response shape for a single ReportJob
@@ -50,6 +51,9 @@ export interface CreateReportJobPayload {
     memberCode?: string;
     region?: string;
     search?: string;
+    // Tax certificate specific
+    trecHolderId?: string;
+    fiscalYear?: string;
   };
 }
 
@@ -104,4 +108,6 @@ export interface ReportTypeConfig {
   hasMemberCodeFilter: boolean;
   hasRegionFilter: boolean;
   hasSearchFilter: boolean;
+  hasTrecHolderFilter?: boolean;
+  hasFiscalYearFilter?: boolean;
 }

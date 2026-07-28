@@ -48,6 +48,19 @@ export const REPORT_TYPE_CONFIGS: ReportTypeConfig[] = [
     hasRegionFilter: true,
     hasSearchFilter: false,
   },
+  {
+    id: "trec_holder_tax_certificate",
+    label: "Tax Collection Certificate",
+    description: "Certificate of Collection of Tax [Section 145(1)] generated from USP_Certificate_Show.",
+    icon: "Award",
+    formats: ["PDF", "XLSX", "CSV"],
+    hasDateFilter: false,
+    hasMemberCodeFilter: false,
+    hasRegionFilter: false,
+    hasSearchFilter: false,
+    hasTrecHolderFilter: true,
+    hasFiscalYearFilter: true,
+  },
 ];
 
 // ---------------------------------------------------------------------------
