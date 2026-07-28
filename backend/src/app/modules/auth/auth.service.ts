@@ -10,12 +10,7 @@ const getMe = async (user: IRequestUser) => {
     const isUserExists = await prisma.user.findUnique({
         where: {
             id: user.userId,
-        },
-        include: {
-            TrecHolder: {
-                include: {},
-            },
-        },
+        }
     });
 
     if (!isUserExists) {

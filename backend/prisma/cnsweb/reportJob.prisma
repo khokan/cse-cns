@@ -1,25 +1,21 @@
 model ReportJob {
   id           String    @id @default(uuid())
   userId       String
-  user         User      @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  reportType   String    // "member_list" | "trec_holder_summary" | "user_activity" | "financial_summary"
-  format       String    // "PDF" | "XLSX" | "CSV"
-  filters      String?   // JSON string of applied filter params
+  reportType   String
+  format       String
+  filters      String?
   status       String    @default("PENDING")
-  // PENDING | PROCESSING | COMPLETED | FAILED | CANCELLED
-
-  queueJobId   String?   // internal p-queue tracking reference (UUID assigned at enqueue)
-  filePath     String?   // relative path under uploads/reports/
-  fileSize     Int?      // bytes
-  fileName     String?   // original file name for download header
+  queueJobId   String?
+  filePath     String?
+  fileSize     Int?
+  fileName     String?
   errorMessage String?
-
   requestedAt  DateTime  @default(now())
   startedAt    DateTime?
   completedAt  DateTime?
+  user         User      @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-  @@index([userId],     name: "idx_reportJob_userId")
-  @@index([status],     name: "idx_reportJob_status")
-  @@index([reportType], name: "idx_reportJob_reportType")
+  @@index([userId], map: "idx_reportJob_userId")
+  @@index([status], map: "idx_reportJob_status")
+  @@index([reportType], map: "idx_reportJob_reportType")
 }

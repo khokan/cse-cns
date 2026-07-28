@@ -1,21 +1,20 @@
 model User {
-  id                String      @id @default(uuid())
+  id                 String      @id @default(uuid())
   name               String
-  email              String    @unique
-  emailVerified      Boolean   @default(false)
-  role               String    @default("TRECHOLDER")
-  status             String    @default("ACTIVE")
-  needPasswordChange Boolean   @default(false)
-  isDeleted          Boolean   @default(false)
+  email              String      @unique
+  emailVerified      Boolean     @default(false)
+  role               String      @default("TRECHOLDER")
+  trecHolderId       String?     // Member ID / TREC ID for TRECHOLDER role (null for ADMIN)
+  status             String      @default("ACTIVE")
+  needPasswordChange Boolean     @default(false)
+  isDeleted          Boolean     @default(false)
   deletedAt          DateTime?
   image              String?
-  createdAt          DateTime  @default(now())
-  updatedAt          DateTime  @updatedAt
+  createdAt          DateTime    @default(now())
+  updatedAt          DateTime    @updatedAt
   accounts           Account[]
-  sessions           Session[]
-  TrecHolder         TrecHolder?
   reportJobs         ReportJob[]
-
+  sessions           Session[]
 }
 
 model Session {
@@ -33,16 +32,16 @@ model Session {
 }
 
 model Account {
-  id                    String    @id
-  accountId             String
-  providerId            String
-  userId                String
-  idToken               String?
-  scope                 String?
-  password              String?
-  createdAt             DateTime  @default(now())
-  updatedAt             DateTime  @updatedAt
-  user                  User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  id         String   @id
+  accountId  String
+  providerId String
+  userId     String
+  idToken    String?
+  scope      String?
+  password   String?
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId])
 }

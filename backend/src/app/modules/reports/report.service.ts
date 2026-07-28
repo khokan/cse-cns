@@ -52,29 +52,34 @@ const requestReport = async (
             throw new AppError(status.NOT_FOUND, "No members found in the Member table.");
         }
 
-        // Map member EmailAddress -> TRECHOLDER userId
-        const trecHolders = await db.cnsWeb.trecHolder.findMany({
-            include: { user: true },
+        // Map member EmailAddress or trecHolderId -> User id
+        const users = await db.cnsWeb.user.findMany({
+            select: { id: true, email: true, trecHolderId: true },
         });
 
         const emailToUserIdMap = new Map<string, string>();
-        for (const th of trecHolders) {
-            if (th.email) emailToUserIdMap.set(th.email.toLowerCase().trim(), th.userId);
-            if (th.user?.email) emailToUserIdMap.set(th.user.email.toLowerCase().trim(), th.userId);
+        const trecIdToUserIdMap = new Map<string, string>();
+        for (const u of users) {
+            if (u.email) emailToUserIdMap.set(u.email.toLowerCase().trim(), u.id);
+            if (u.trecHolderId) trecIdToUserIdMap.set(u.trecHolderId.trim(), u.id);
         }
 
         let createdCount = 0;
 
         for (const m of members) {
-            const memberCode = m.MemberCode || m.MemberID;
-            if (!memberCode) continue;
+            const memberId = m.MemberCode || m.MemberID;
+            if (!memberId) continue;
 
-            const targetUserId = (m.EmailAddress && emailToUserIdMap.get(m.EmailAddress.toLowerCase().trim())) || userId;
+            const targetUserId =
+                trecIdToUserIdMap.get(memberId) ||
+                (m.EmailAddress && emailToUserIdMap.get(m.EmailAddress.toLowerCase().trim())) ||
+                userId;
 
             const bQueueJobId = uuidv4();
             const memberFilters = {
                 fiscalYear: filters.fiscalYear,
-                memberCode,
+                trecHolderId: memberId,
+                memberCode: m.MemberCode,
             };
 
             const reportJob = await db.cnsWeb.reportJob.create({
@@ -113,15 +118,51 @@ const requestReport = async (
         };
     }
 
-    // Single report job request
+    // Single report job request — if trecHolderId is missing, resolve MemberID / trecHolderId for logged-in TRECHOLDER
     if (dto.reportType === "trec_holder_tax_certificate" && !filters.trecHolderId) {
-        filters.trecHolderId = userId;
+        const user = await db.cnsWeb.user.findUnique({ where: { id: userId } });
+        if (user?.trecHolderId) {
+            filters.trecHolderId = user.trecHolderId;
+        } else if (user?.email) {
+            const member = await db.cnsWeb.member.findFirst({
+                where: { EmailAddress: user.email },
+            });
+            filters.trecHolderId = member?.MemberID || member?.MemberCode || userId;
+        } else {
+            filters.trecHolderId = userId;
+        }
+    }
+
+    // Verify user exists before creating report job
+    const requestingUser = await db.cnsWeb.user.findUnique({
+        where: { id: userId },
+        select: { id: true, trecHolderId: true },
+    });
+    if (!requestingUser) {
+        throw new AppError(status.UNAUTHORIZED, "User account not found. Please log in again.");
+    }
+
+    // Target userId for job: if trecHolderId is specified (e.g. by admin), attempt matching to user account
+    let jobTargetUserId = userId;
+    if (filters.trecHolderId) {
+        const targetUser = await db.cnsWeb.user.findFirst({
+            where: {
+                OR: [
+                    { trecHolderId: filters.trecHolderId.trim() },
+                    { email: filters.trecHolderId.trim() },
+                ],
+            },
+            select: { id: true },
+        });
+        if (targetUser) {
+            jobTargetUserId = targetUser.id;
+        }
     }
 
     // Create DB record
     const reportJob = await db.cnsWeb.reportJob.create({
         data: {
-            userId,
+            userId: jobTargetUserId,
             reportType: dto.reportType,
             format: dto.format,
             filters: Object.keys(filters).length > 0 ? JSON.stringify(filters) : null,
@@ -134,7 +175,7 @@ const requestReport = async (
     enqueueReportJob(async () => {
         await processReportJob({
             reportJobId: reportJob.id,
-            userId,
+            userId: jobTargetUserId,
             reportType: dto.reportType,
             format: dto.format,
             filters,
@@ -154,6 +195,7 @@ const requestReport = async (
 
 // ---------------------------------------------------------------------------
 // getJobs — paginated list, scoped to user (or all for ADMIN/IT)
+// Matches by userId OR trecHolderId found in filters JSON column!
 // ---------------------------------------------------------------------------
 const getJobs = async (
     userId: string,
@@ -167,8 +209,23 @@ const getJobs = async (
     const canViewAll =
         (query.all === "true") && ["ADMIN", "IT"].includes(userRole);
 
+    const currentUser = await db.cnsWeb.user.findUnique({
+        where: { id: userId },
+        select: { trecHolderId: true },
+    });
+    const userTrecId = currentUser?.trecHolderId?.trim();
+
+    const userScopedWhere = userTrecId
+        ? {
+              OR: [
+                  { userId },
+                  { filters: { contains: `"${userTrecId}"` } },
+              ],
+          }
+        : { userId };
+
     const where = {
-        ...(canViewAll ? {} : { userId }),
+        ...(canViewAll ? {} : userScopedWhere),
         ...(query.status ? { status: query.status } : {}),
         ...(query.reportType ? { reportType: query.reportType } : {}),
         ...(query.format ? { format: query.format } : {}),
@@ -211,8 +268,15 @@ const getJob = async (jobId: string, userId: string, userRole: string) => {
         throw new AppError(status.NOT_FOUND, "Report job not found.");
     }
 
+    const currentUser = await db.cnsWeb.user.findUnique({
+        where: { id: userId },
+        select: { trecHolderId: true },
+    });
+    const userTrecId = currentUser?.trecHolderId?.trim();
     const canAccess =
-        job.userId === userId || ["ADMIN", "IT"].includes(userRole);
+        job.userId === userId ||
+        ["ADMIN", "IT"].includes(userRole) ||
+        (Boolean(userTrecId) && Boolean(job.filters?.includes(userTrecId!)));
 
     if (!canAccess) {
         throw new AppError(

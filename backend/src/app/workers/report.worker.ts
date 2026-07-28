@@ -195,38 +195,21 @@ async function fetchTaxCertificate(filters: Filters): Promise<Record<string, unk
     }
 
     // -----------------------------------------------------------------------
-    // 1. Resolve MemberID
+    // 1. Resolve MemberID directly from filters (trecHolderId / memberCode)
     // -----------------------------------------------------------------------
-    let memberId = memberCodeDirect;
-    let tin = "";
+    const memberId = (filters.trecHolderId as string | undefined) || (filters.memberCode as string | undefined) || "";
 
-    if (trecHolderId) {
-        const trecHolder = await db.cnsWeb.trecHolder.findUnique({
-            where: { id: trecHolderId },
-        });
-        if (!trecHolder) {
-            throw new Error(`TrecHolder with ID "${trecHolderId}" not found.`);
-        }
-
-        // Resolve MemberID via email match on CNSWeb Member table
-        const member = await db.cnsWeb.member.findFirst({
-            where: { MemberID: trecHolder.id },
-        });
-
-        if (!member) {
-            throw new Error(`No Member record found for TrecHolder email "${trecHolder.email}".`);
-        }
-
-        memberId = member.MemberID;
-        tin = member.TIN ?? "";
-    } else {
-        // ADMIN passed memberCode directly — look up TIN from CNSWeb
-        const member = await db.cnsWeb.member.findFirst({
-            where: { MemberCode: memberCodeDirect },
-        });
-        tin = member?.TIN ?? "";
-        if (!memberId) memberId = member?.MemberID ?? memberCodeDirect;
+    if (!memberId) {
+        throw new Error("Member ID (trecHolderId or memberCode filter) is required for the tax certificate report.");
     }
+
+    // Look up Member from CNSWeb Member table to get TIN
+    const member = await db.cnsWeb.member.findFirst({
+        where: {
+            OR: [{ MemberID: memberId }, { MemberCode: memberId }],
+        },
+    });
+    const tin = member?.TIN ?? "";
 
     // -----------------------------------------------------------------------
     // 2. Convert fiscal year → MSSQL date strings

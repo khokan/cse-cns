@@ -16,8 +16,23 @@ export const auth = betterAuth({
     }),
     emailAndPassword: { 
         enabled: true, 
-        requireEmailVerification: true
+        requireEmailVerification: false
     }, 
+
+    databaseHooks: {
+        user: {
+            create: {
+                before: async (user) => {
+                    return {
+                        data: {
+                            ...user,
+                            emailVerified: true,
+                        },
+                    };
+                },
+            },
+        },
+    },
 
     socialProviders:{
         google:{
@@ -38,8 +53,8 @@ export const auth = betterAuth({
     },
 
     emailVerification: {
-        sendOnSignUp: true,
-        sendOnSignIn: true,
+        sendOnSignUp: false,
+        sendOnSignIn: false,
         autoSignInAfterVerification: true
     },
 
@@ -49,6 +64,12 @@ export const auth = betterAuth({
                 type: "string",
                 required: true,
                 defaultValue: UserRole.TRECHOLDER
+            },
+
+            trecHolderId: {
+                type: "string",
+                required: false,
+                defaultValue: null
             },
 
             status: {
