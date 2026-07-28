@@ -8,6 +8,7 @@ import { Footer } from "@/components/shared/footer";
 import { Toaster } from "sonner";
 import Navbar from "@/components/shared/navbar";
 import { ThemeProvider } from "@/components/providers/theme-provider";
+import QueryProviders from "@/components/providers/Queryprovider";
 
 export const metadata: Metadata = {
   title: "CSE WEB",
@@ -23,8 +24,10 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     <html lang="en" suppressHydrationWarning>
       <body>
         <ThemeProvider>
-          <main className="min-h-[calc(100vh-170px)]">{children}</main>
-          <Toaster richColors position="top-right" />
+          <QueryProviders>
+            <main className="min-h-[calc(100vh-170px)]">{children}</main>
+            <Toaster richColors position="top-right" />
+          </QueryProviders>
         </ThemeProvider>
       </body>
     </html>

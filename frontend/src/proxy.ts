@@ -39,6 +39,7 @@ export const config = {
     "/admin/dashboard/:path*",
     "/change-password",
     "/my-profile",
+    "/reports/:path*",
   ],
 
 };

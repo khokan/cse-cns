@@ -27,6 +27,21 @@ export const getCommonNavItems = (role : UserRole) : NavSection[] => {
             ]
         },
         {
+            title : "Reports",
+            items : [
+                {
+                    title : "New Report",
+                    href : "/reports",
+                    icon : "FileBarChart"
+                },
+                {
+                    title : "Download Center",
+                    href : "/reports/download-center",
+                    icon : "Download"
+                }
+            ]
+        },
+        {
             title : "Settings",
             items : [
                 {
