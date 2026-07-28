@@ -37,7 +37,81 @@ const requestReport = async (
     const queueJobId = uuidv4();
     const filters = dto.filters ?? {};
 
-    // For tax certificates, default trecHolderId to the requesting user's ID if not explicitly specified
+    // -----------------------------------------------------------------------
+    // BULK GENERATION FOR ADMIN
+    // Admin clicks single button to generate tax certificates for ALL members in Member table
+    // -----------------------------------------------------------------------
+    if (filters.isBulk && dto.reportType === "trec_holder_tax_certificate") {
+        const members = await db.cnsWeb.member.findMany({
+            select: { MemberID: true, MemberCode: true, EmailAddress: true, MemberName: true },
+        });
+
+        if (members.length === 0) {
+            throw new AppError(status.NOT_FOUND, "No members found in the Member table.");
+        }
+
+        // Map member EmailAddress -> TRECHOLDER userId
+        const trecHolders = await db.cnsWeb.trecHolder.findMany({
+            include: { user: true },
+        });
+
+        const emailToUserIdMap = new Map<string, string>();
+        for (const th of trecHolders) {
+            if (th.email) emailToUserIdMap.set(th.email.toLowerCase().trim(), th.userId);
+            if (th.user?.email) emailToUserIdMap.set(th.user.email.toLowerCase().trim(), th.userId);
+        }
+
+        let createdCount = 0;
+
+        for (const m of members) {
+            const memberCode = m.MemberCode || m.MemberID;
+            if (!memberCode) continue;
+
+            const targetUserId = (m.EmailAddress && emailToUserIdMap.get(m.EmailAddress.toLowerCase().trim())) || userId;
+
+            const bQueueJobId = uuidv4();
+            const memberFilters = {
+                fiscalYear: filters.fiscalYear,
+                memberCode,
+            };
+
+            const reportJob = await db.cnsWeb.reportJob.create({
+                data: {
+                    userId: targetUserId,
+                    reportType: dto.reportType,
+                    format: dto.format,
+                    filters: JSON.stringify(memberFilters),
+                    status: "PENDING",
+                    queueJobId: bQueueJobId,
+                },
+            });
+
+            enqueueReportJob(async () => {
+                await processReportJob({
+                    reportJobId: reportJob.id,
+                    userId: targetUserId,
+                    reportType: dto.reportType,
+                    format: dto.format,
+                    filters: memberFilters,
+                });
+            });
+
+            createdCount++;
+        }
+
+        return {
+            jobId: "bulk-batch",
+            queueJobId: "bulk-batch",
+            status: "PENDING",
+            reportType: dto.reportType,
+            format: dto.format,
+            requestedAt: new Date(),
+            estimatedWait: 30,
+            message: `Successfully enqueued ${createdCount} report jobs for all members in the Member table.`,
+        };
+    }
+
+    // Single report job request
     if (dto.reportType === "trec_holder_tax_certificate" && !filters.trecHolderId) {
         filters.trecHolderId = userId;
     }
@@ -149,7 +223,7 @@ const getJob = async (jobId: string, userId: string, userRole: string) => {
 };
 
 // ---------------------------------------------------------------------------
-// cancelJob — marks PENDING jobs as CANCELLED
+// cancelJob — TRECHOLDER can cancel their OWN pending/processing job
 // ---------------------------------------------------------------------------
 const cancelJob = async (
     jobId: string,
@@ -157,6 +231,13 @@ const cancelJob = async (
     userRole: string
 ) => {
     const job = await getJob(jobId, userId, userRole);
+
+    if (job.userId !== userId && !["ADMIN", "IT"].includes(userRole)) {
+        throw new AppError(
+            status.FORBIDDEN,
+            "You can only cancel your own report jobs."
+        );
+    }
 
     if (!["PENDING", "PROCESSING"].includes(job.status)) {
         throw new AppError(
@@ -170,12 +251,39 @@ const cancelJob = async (
         data: { status: "CANCELLED", completedAt: new Date() },
     });
 
-    // If file was already written (PROCESSING reached disk step), clean it up
     if (updated.filePath) {
         await storageLib.deleteReport(updated.filePath);
     }
 
     return updated;
+};
+
+// ---------------------------------------------------------------------------
+// deleteJob — ADMIN/IT can delete any report job and purge its file
+// TRECHOLDER calling delete will trigger cancelJob for pending/processing jobs
+// ---------------------------------------------------------------------------
+const deleteJob = async (
+    jobId: string,
+    userId: string,
+    userRole: string
+) => {
+    const job = await getJob(jobId, userId, userRole);
+
+    const isAdminOrIT = ["ADMIN", "IT"].includes(userRole);
+
+    if (isAdminOrIT) {
+        // ADMIN can delete ANY report job permanently (and remove file from disk)
+        if (job.filePath) {
+            await storageLib.deleteReport(job.filePath);
+        }
+        const deleted = await db.cnsWeb.reportJob.delete({
+            where: { id: jobId },
+        });
+        return deleted;
+    }
+
+    // Non-admin (TRECHOLDER) attempts cancel instead
+    return cancelJob(jobId, userId, userRole);
 };
 
 // ---------------------------------------------------------------------------
@@ -206,10 +314,52 @@ const getJobForDownload = async (
     return job;
 };
 
+// ---------------------------------------------------------------------------
+// deleteAllJobs — ADMIN bulk deletion of all report jobs matching filter
+// Deletes files from disk storage and purges DB records
+// ---------------------------------------------------------------------------
+const deleteAllJobs = async (
+    userId: string,
+    userRole: string,
+    reportType?: string,
+    statusFilter?: string
+) => {
+    if (!["ADMIN", "IT"].includes(userRole)) {
+        throw new AppError(status.FORBIDDEN, "Only administrators can perform bulk report deletion.");
+    }
+
+    const where = {
+        ...(reportType ? { reportType: reportType as ReportType } : {}),
+        ...(statusFilter && statusFilter !== "ALL" ? { status: statusFilter as ReportStatus } : {}),
+    };
+
+    // 1. Fetch matching jobs to clean up files on disk
+    const jobs = await db.cnsWeb.reportJob.findMany({
+        where,
+        select: { id: true, filePath: true },
+    });
+
+    // 2. Delete all files from storage disk
+    for (const job of jobs) {
+        if (job.filePath) {
+            await storageLib.deleteReport(job.filePath);
+        }
+    }
+
+    // 3. Purge DB records in bulk
+    const result = await db.cnsWeb.reportJob.deleteMany({ where });
+
+    return {
+        count: result.count,
+    };
+};
+
 export const ReportService = {
     requestReport,
     getJobs,
     getJob,
     cancelJob,
+    deleteJob,
+    deleteAllJobs,
     getJobForDownload,
 };

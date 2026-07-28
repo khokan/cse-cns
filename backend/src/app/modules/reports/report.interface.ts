@@ -31,6 +31,7 @@ export interface ReportFilters {
     // Tax certificate specific
     trecHolderId?: string;  // UUID of TrecHolder in CNSWeb DB
     fiscalYear?: string;    // e.g. "2025-2026" — passed directly to USP_Certificate_Show
+    isBulk?: boolean;       // ADMIN bulk generation for all members in Member table
 }
 
 // ---------------------------------------------------------------------------

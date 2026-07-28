@@ -106,20 +106,45 @@ const downloadReport = catchAsync(async (req: Request, res: Response) => {
 });
 
 // ---------------------------------------------------------------------------
-// DELETE /api/v1/reports/jobs/:id  (cancel)
+// DELETE /api/v1/reports/jobs/:id  (cancel for trecholders / delete for admin)
 // ---------------------------------------------------------------------------
 const cancelJob = catchAsync(async (req: Request, res: Response) => {
     const { id } = req.params;
     const userId = req.user!.userId;
     const userRole = req.user!.role;
 
-    const job = await ReportService.cancelJob(id, userId, userRole);
+    const result = await ReportService.deleteJob(id, userId, userRole);
 
     sendResponse(res, {
         httpStatusCode: status.OK,
         success: true,
-        message: "Report job cancelled successfully.",
-        data: job,
+        message: "status" in result && result.status === "CANCELLED"
+            ? "Report job cancelled successfully."
+            : "Report job and file deleted successfully.",
+        data: result,
+    });
+});
+
+// ---------------------------------------------------------------------------
+// DELETE /api/v1/reports/jobs  (Bulk delete for ADMIN)
+// ---------------------------------------------------------------------------
+const deleteAllJobs = catchAsync(async (req: Request, res: Response) => {
+    const userId = req.user!.userId;
+    const userRole = req.user!.role;
+    const { reportType, status: statusFilter } = req.query;
+
+    const result = await ReportService.deleteAllJobs(
+        userId,
+        userRole,
+        reportType as string | undefined,
+        statusFilter as string | undefined
+    );
+
+    sendResponse(res, {
+        httpStatusCode: status.OK,
+        success: true,
+        message: `Successfully deleted ${result.count} report records and associated files.`,
+        data: result,
     });
 });
 
@@ -129,4 +154,5 @@ export const ReportController = {
     getJob,
     downloadReport,
     cancelJob,
+    deleteAllJobs,
 };

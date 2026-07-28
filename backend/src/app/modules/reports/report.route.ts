@@ -36,7 +36,14 @@ router.get(
     ReportController.downloadReport
 );
 
-// Cancel a PENDING or PROCESSING job
+// Bulk delete all report jobs (ADMIN only)
+router.delete(
+    "/jobs",
+    checkAuth(UserRole.ADMIN, UserRole.IT),
+    ReportController.deleteAllJobs
+);
+
+// Cancel/Delete a single job by ID
 router.delete(
     "/jobs/:id",
     checkAuth(UserRole.ADMIN, UserRole.IT, UserRole.ACCOUNTING, UserRole.TRECHOLDER),
