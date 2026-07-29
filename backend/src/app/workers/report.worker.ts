@@ -195,20 +195,23 @@ async function fetchTaxCertificate(filters: Filters): Promise<Record<string, unk
     }
 
     // -----------------------------------------------------------------------
-    // 1. Resolve MemberID directly from filters (trecHolderId / memberCode)
+    // 1. Resolve actual numeric MemberID (e.g. "121001") from Member table
     // -----------------------------------------------------------------------
-    const memberId = (filters.trecHolderId as string | undefined) || (filters.memberCode as string | undefined) || "";
+    const rawFilterId = (filters.trecHolderId as string | undefined) || (filters.memberCode as string | undefined) || "";
 
-    if (!memberId) {
+    if (!rawFilterId) {
         throw new Error("Member ID (trecHolderId or memberCode filter) is required for the tax certificate report.");
     }
 
-    // Look up Member from CNSWeb Member table to get TIN
+    // Look up Member from CNSWeb Member table to get actual MemberID & TIN
     const member = await db.cnsWeb.member.findFirst({
         where: {
-            OR: [{ MemberID: memberId }, { MemberCode: memberId }],
+            OR: [{ MemberID: rawFilterId }, { MemberCode: rawFilterId }],
         },
     });
+
+    // Stored procedure USP_Certificate_Show strictly requires numeric MemberID (e.g. "121001")
+    const memberId = member?.MemberID || rawFilterId;
     const tin = member?.TIN ?? "";
 
     // -----------------------------------------------------------------------

@@ -50,4 +50,11 @@ router.delete(
     ReportController.cancelJob
 );
 
+// List members for selection UI (ADMIN/IT only)
+router.get(
+    "/members",
+    checkAuth(UserRole.ADMIN, UserRole.IT),
+    ReportController.getMembersList
+);
+
 export const ReportRoutes = router;

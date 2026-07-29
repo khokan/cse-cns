@@ -57,6 +57,13 @@ const requestReport = async (
             select: { id: true, email: true, trecHolderId: true },
         });
 
+        if (users.length === 0) {
+            throw new AppError(status.NOT_FOUND, "No users found in the User table.");
+        }
+
+        const validUserIds = new Set<string>(users.map((u) => u.id));
+        const fallbackUserId = validUserIds.has(userId) ? userId : users[0].id;
+
         const emailToUserIdMap = new Map<string, string>();
         const trecIdToUserIdMap = new Map<string, string>();
         for (const u of users) {
@@ -67,13 +74,16 @@ const requestReport = async (
         let createdCount = 0;
 
         for (const m of members) {
-            const memberId = m.MemberCode || m.MemberID;
+            const memberId = m.MemberID || m.MemberCode;
             if (!memberId) continue;
 
-            const targetUserId =
+            const matchedUserId =
                 trecIdToUserIdMap.get(memberId) ||
-                (m.EmailAddress && emailToUserIdMap.get(m.EmailAddress.toLowerCase().trim())) ||
-                userId;
+                (m.EmailAddress && emailToUserIdMap.get(m.EmailAddress.toLowerCase().trim()));
+
+            const targetUserId = (matchedUserId && validUserIds.has(matchedUserId))
+                ? matchedUserId
+                : fallbackUserId;
 
             const bQueueJobId = uuidv4();
             const memberFilters = {
@@ -154,9 +164,18 @@ const requestReport = async (
             },
             select: { id: true },
         });
-        if (targetUser) {
+        if (targetUser?.id) {
             jobTargetUserId = targetUser.id;
         }
+    }
+
+    // Verify jobTargetUserId exists in User table
+    const targetUserExists = await db.cnsWeb.user.findUnique({
+        where: { id: jobTargetUserId },
+        select: { id: true },
+    });
+    if (!targetUserExists) {
+        jobTargetUserId = userId;
     }
 
     // Create DB record

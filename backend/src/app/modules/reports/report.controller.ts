@@ -148,6 +148,19 @@ const deleteAllJobs = catchAsync(async (req: Request, res: Response) => {
     });
 });
 
+// ---------------------------------------------------------------------------
+// GET /api/v1/reports/members (Fetch members list for selection)
+// ---------------------------------------------------------------------------
+const getMembersList = catchAsync(async (_req: Request, res: Response) => {
+    const result = await ReportService.getMembersList();
+    sendResponse(res, {
+        httpStatusCode: status.OK,
+        success: true,
+        message: "Members list fetched successfully.",
+        data: result,
+    });
+});
+
 export const ReportController = {
     requestReport,
     getJobs,
@@ -155,4 +168,5 @@ export const ReportController = {
     downloadReport,
     cancelJob,
     deleteAllJobs,
+    getMembersList,
 };
