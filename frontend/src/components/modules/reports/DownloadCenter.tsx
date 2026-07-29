@@ -9,6 +9,9 @@ import {
   ChevronLeft,
   ChevronRight,
   Trash2,
+  CheckCircle2,
+  AlertCircle,
+  Clock,
 } from "lucide-react";
 import { JobProgressCard } from "./JobProgressCard";
 import { JobStatusBadge } from "./JobStatusBadge";
@@ -53,6 +56,17 @@ export function DownloadCenter({ userRole }: DownloadCenterProps) {
   const jobs = data?.data ?? [];
   const meta = data?.meta;
   const totalPages = meta?.totalPages ?? 1;
+
+  // Calculate batch metrics for current view
+  const completedJobs = jobs.filter((j) => j.status === "COMPLETED");
+  const processingJobs = jobs.filter((j) => j.status === "PROCESSING");
+  const pendingJobs = jobs.filter((j) => j.status === "PENDING");
+  const failedJobs = jobs.filter((j) => j.status === "FAILED");
+
+  const batchTotal = jobs.length;
+  const hasActiveJobs = processingJobs.length > 0 || pendingJobs.length > 0;
+  const percentCompleted = batchTotal > 0 ? Math.round((completedJobs.length / batchTotal) * 100) : 0;
+  const isAllComplete = !hasActiveJobs && batchTotal > 0 && completedJobs.length === batchTotal;
 
   const handleRefresh = () => {
     queryClient.invalidateQueries({ queryKey: ["report-jobs"] });
@@ -125,6 +139,88 @@ export function DownloadCenter({ userRole }: DownloadCenterProps) {
           </button>
         </div>
       </div>
+
+      {/* Progress Notification Banner (Batch / Active Job Progress) */}
+      {(hasActiveJobs || completedJobs.length > 0) && (
+        <div className="rounded-2xl border border-primary/20 bg-gradient-to-br from-primary/10 via-card to-card p-5 shadow-sm space-y-4">
+          <div className="flex items-center justify-between gap-3">
+            <div className="flex items-center gap-3">
+              <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-primary/20 text-primary">
+                {hasActiveJobs ? (
+                  <Loader2 className="w-5 h-5 animate-spin text-primary" />
+                ) : isAllComplete ? (
+                  <CheckCircle2 className="w-5 h-5 text-emerald-600" />
+                ) : (
+                  <CheckCircle2 className="w-5 h-5 text-primary" />
+                )}
+              </div>
+              <div>
+                <h3 className="text-sm font-semibold text-foreground">
+                  {hasActiveJobs
+                    ? "Report Generation in Progress..."
+                    : isAllComplete
+                    ? "Report Generation Complete"
+                    : "Batch Report Status Summary"}
+                </h3>
+                <p className="text-xs text-muted-foreground">
+                  {completedJobs.length} of {batchTotal} reports completed ({percentCompleted}%)
+                </p>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-2 text-xs font-medium">
+              {processingJobs.length > 0 && (
+                <span className="flex items-center gap-1 px-2.5 py-1 rounded-full bg-blue-100 dark:bg-blue-900/30 text-blue-600">
+                  <Loader2 className="w-3 h-3 animate-spin" />
+                  {processingJobs.length} Processing
+                </span>
+              )}
+              {pendingJobs.length > 0 && (
+                <span className="flex items-center gap-1 px-2.5 py-1 rounded-full bg-amber-100 dark:bg-amber-900/30 text-amber-600">
+                  <Clock className="w-3 h-3" />
+                  {pendingJobs.length} Queued
+                </span>
+              )}
+              <span className="flex items-center gap-1 px-2.5 py-1 rounded-full bg-emerald-100 dark:bg-emerald-900/30 text-emerald-600">
+                <CheckCircle2 className="w-3 h-3" />
+                {completedJobs.length} Done
+              </span>
+            </div>
+          </div>
+
+          {/* Progress Bar */}
+          <div className="h-2 w-full rounded-full bg-muted overflow-hidden">
+            <div
+              className="h-full bg-gradient-to-r from-primary via-blue-500 to-emerald-500 transition-all duration-500"
+              style={{ width: `${percentCompleted}%` }}
+            />
+          </div>
+
+          {/* Live List of Completed Member Reports */}
+          {completedJobs.length > 0 && (
+            <div className="pt-3 border-t border-border/50 space-y-2">
+              <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+                Completed Member Reports ({completedJobs.length}):
+              </p>
+              <div className="flex flex-wrap gap-2 max-h-28 overflow-y-auto pr-1">
+                {completedJobs.map((j) => {
+                  const filtersObj = j.filters ? JSON.parse(j.filters) : {};
+                  const memberId = filtersObj.trecHolderId || filtersObj.memberCode || j.id.slice(0, 8);
+                  return (
+                    <span
+                      key={j.id}
+                      className="inline-flex items-center gap-1.5 rounded-lg bg-emerald-500/10 border border-emerald-500/20 px-2.5 py-1 text-xs font-medium text-emerald-600 dark:text-emerald-400"
+                    >
+                      <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500 shrink-0" />
+                      Member [{memberId}]
+                    </span>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Status filter tabs */}
       <div className="flex gap-1.5 flex-wrap">

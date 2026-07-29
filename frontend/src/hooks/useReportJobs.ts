@@ -118,3 +118,19 @@ export const useDeleteAllReportJobs = () => {
     },
   });
 };
+
+// ---------------------------------------------------------------------------
+// Hook: fetch members list for selection box
+// ---------------------------------------------------------------------------
+export const useMembersList = (enabled: boolean = true) =>
+  useQuery({
+    queryKey: ["report-members-list"],
+    queryFn: async () => {
+      const { getMembersList } = await import("@/services/report.service");
+      const { data, error } = await getMembersList();
+      if (error) throw new Error(error.message);
+      return data?.data ?? [];
+    },
+    enabled,
+    staleTime: 5 * 60 * 1000,
+  });

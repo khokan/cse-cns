@@ -40,16 +40,25 @@ const requestReport = async (
     const filters = dto.filters ?? {};
 
     // -----------------------------------------------------------------------
-    // BULK GENERATION FOR ADMIN
-    // Admin clicks single button to generate tax certificates for ALL members in Member table
+    // BATCH / SELECTION / BULK GENERATION FOR ADMIN
+    // Admin selects specific members or clicks all members to generate tax certificates
     // -----------------------------------------------------------------------
-    if (filters.isBulk && dto.reportType === "trec_holder_tax_certificate") {
+    const selectedMemberIds = Array.isArray(filters.selectedMemberIds) && filters.selectedMemberIds.length > 0
+        ? filters.selectedMemberIds
+        : null;
+
+    if ((filters.isBulk || selectedMemberIds) && dto.reportType === "trec_holder_tax_certificate") {
+        const whereClause = selectedMemberIds
+            ? { MemberID: { in: selectedMemberIds } }
+            : {};
+
         const members = await db.cnsWeb.member.findMany({
+            where: whereClause,
             select: { MemberID: true, MemberCode: true, EmailAddress: true, MemberName: true },
         });
 
         if (members.length === 0) {
-            throw new AppError(status.NOT_FOUND, "No members found in the Member table.");
+            throw new AppError(status.NOT_FOUND, "No matching members found in the Member table.");
         }
 
         // Map member EmailAddress or trecHolderId -> User id
@@ -124,7 +133,7 @@ const requestReport = async (
             format: dto.format,
             requestedAt: new Date(),
             estimatedWait: 30,
-            message: `Successfully enqueued ${createdCount} report jobs for all members in the Member table.`,
+            message: `Successfully enqueued ${createdCount} report jobs for selected members.`,
         };
     }
 
@@ -439,6 +448,26 @@ const deleteAllJobs = async (
     };
 };
 
+// ---------------------------------------------------------------------------
+// getMembersList — returns list of members for Admin multi-selection UI
+// ---------------------------------------------------------------------------
+const getMembersList = async () => {
+    const members = await db.cnsWeb.member.findMany({
+        select: {
+            MemberID: true,
+            MemberCode: true,
+            MemberName: true,
+        },
+        orderBy: { MemberID: "asc" },
+    });
+
+    return members.map((m) => ({
+        memberId: m.MemberID,
+        memberCode: m.MemberCode,
+        memberName: m.MemberName ?? m.MemberCode ?? m.MemberID,
+    }));
+};
+
 export const ReportService = {
     requestReport,
     getJobs,
@@ -447,4 +476,5 @@ export const ReportService = {
     deleteJob,
     deleteAllJobs,
     getJobForDownload,
+    getMembersList,
 };

@@ -109,6 +109,22 @@ export const deleteAllReportJobs = async (
 };
 
 // ---------------------------------------------------------------------------
+// GET /api/v1/reports/members (fetch member list for selection UI)
+// ---------------------------------------------------------------------------
+export interface MemberListItem {
+  memberId: string;
+  memberCode: string;
+  memberName: string;
+}
+
+export const getMembersList = async (): Promise<{
+  data: { data: MemberListItem[] } | null;
+  error: { message: string } | null;
+}> => {
+  return apiFetch("/reports/members");
+};
+
+// ---------------------------------------------------------------------------
 // Download — opens the stream endpoint in a new tab / triggers browser download
 // ---------------------------------------------------------------------------
 export const downloadReport = (id: string): void => {

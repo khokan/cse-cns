@@ -1,11 +1,11 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
-import { FileBarChart, Loader2, Filter, Users } from "lucide-react";
+import { FileBarChart, Loader2, Filter, Users, CheckSquare, Square, Search } from "lucide-react";
 import { ReportTypeSelector } from "./ReportTypeSelector";
-import { useRequestReport } from "@/hooks/useReportJobs";
+import { useRequestReport, useMembersList } from "@/hooks/useReportJobs";
 import { REPORT_TYPE_CONFIGS } from "@/constants/reportConstants";
 import type { ReportFormat, ReportType } from "@/types/report.types";
 import { cn } from "@/utils/utils";
@@ -31,6 +31,9 @@ export function ReportRequestForm({ userRole }: ReportRequestFormProps) {
   const isAdmin = ["ADMIN", "IT"].includes(userRole ?? "");
   const isTrecHolder = userRole === "TRECHOLDER";
 
+  // Fetch members list for selection box when Admin
+  const { data: membersList = [] } = useMembersList(isAdmin);
+
   // Form state
   const [reportType, setReportType] = useState<ReportType>("trec_holder_tax_certificate");
   const [format, setFormat] = useState<ReportFormat>("PDF");
@@ -42,7 +45,37 @@ export function ReportRequestForm({ userRole }: ReportRequestFormProps) {
   const [trecHolderId, setTrecHolderId] = useState("");
   const [fiscalYear, setFiscalYear] = useState("2024-2025");
 
+  // Selection box state for ADMIN
+  const [selectedMemberIds, setSelectedMemberIds] = useState<string[]>([]);
+  const [memberSearchText, setMemberSearchText] = useState("");
+
   const config = REPORT_TYPE_CONFIGS.find((c) => c.id === reportType)!;
+
+  // Filter members list based on search text
+  const filteredMembers = useMemo(() => {
+    if (!memberSearchText.trim()) return membersList;
+    const q = memberSearchText.toLowerCase();
+    return membersList.filter(
+      (m) =>
+        m.memberId.toLowerCase().includes(q) ||
+        m.memberCode.toLowerCase().includes(q) ||
+        m.memberName.toLowerCase().includes(q)
+    );
+  }, [membersList, memberSearchText]);
+
+  const handleToggleMember = (memberId: string) => {
+    setSelectedMemberIds((prev) =>
+      prev.includes(memberId) ? prev.filter((id) => id !== memberId) : [...prev, memberId]
+    );
+  };
+
+  const handleToggleSelectAll = () => {
+    if (selectedMemberIds.length === membersList.length) {
+      setSelectedMemberIds([]);
+    } else {
+      setSelectedMemberIds(membersList.map((m) => m.memberId));
+    }
+  };
 
   const handleGenerate = (isBulk: boolean = false) => {
     if (config.hasFiscalYearFilter && !fiscalYear.trim()) {
@@ -50,8 +83,15 @@ export function ReportRequestForm({ userRole }: ReportRequestFormProps) {
       return;
     }
 
-    if (!isBulk && isAdmin && config.hasTrecHolderFilter && !trecHolderId.trim() && !memberCode.trim()) {
-      toast.error("Please enter a Member Code / TREC Holder ID, or click 'Generate for All Members'.");
+    if (
+      !isBulk &&
+      selectedMemberIds.length === 0 &&
+      isAdmin &&
+      config.hasTrecHolderFilter &&
+      !trecHolderId.trim() &&
+      !memberCode.trim()
+    ) {
+      toast.error("Please select members, enter a TREC Holder ID, or click 'Generate for All Members'.");
       return;
     }
 
@@ -64,18 +104,23 @@ export function ReportRequestForm({ userRole }: ReportRequestFormProps) {
       ...(config.hasTrecHolderFilter && trecHolderId ? { trecHolderId: trecHolderId.trim() } : {}),
       ...(config.hasFiscalYearFilter && fiscalYear ? { fiscalYear } : {}),
       ...(isBulk ? { isBulk: true } : {}),
+      ...(selectedMemberIds.length > 0 && !isBulk ? { selectedMemberIds } : {}),
     };
+
+    const isMultiBatch = isBulk || selectedMemberIds.length > 1;
 
     request(
       { reportType, format, filters },
       {
         onSuccess: () => {
-          const description = isBulk
-            ? `Batch report generation queued for all members in the Member table.`
-            : `Your ${config.label} (${format}) is being generated.`;
+          const countLabel = isBulk
+            ? `all ${membersList.length} members`
+            : `${selectedMemberIds.length} selected member(s)`;
 
-          toast.success(isBulk ? "Batch Reports Queued!" : "Report Queued!", {
-            description,
+          toast.success(isMultiBatch ? "Batch Reports Queued!" : "Report Queued!", {
+            description: isMultiBatch
+              ? `Report generation initiated for ${countLabel}. Track progress in Download Center.`
+              : `Your ${config.label} (${format}) is being generated.`,
             action: {
               label: "View Progress",
               onClick: () => router.push("/reports/download-center"),
@@ -187,25 +232,6 @@ export function ReportRequestForm({ userRole }: ReportRequestFormProps) {
               </div>
             )}
 
-            {/* ---- Tax Certificate specific filters ---- */}
-            {/* For ADMIN: optional member code / trec holder id input */}
-            {config.hasTrecHolderFilter && isAdmin && (
-              <div className="space-y-1.5 sm:col-span-2">
-                <label className={labelClass}>
-                  Member Code / TREC Holder ID
-                  <span className="ml-1 text-xs text-muted-foreground font-normal">(optional — leave blank when generating for all members)</span>
-                </label>
-                <input
-                  id="trecHolderId"
-                  type="text"
-                  placeholder="e.g. 121001 (leave blank to batch generate for all members)"
-                  value={trecHolderId}
-                  onChange={(e) => setTrecHolderId(e.target.value)}
-                  className={inputClass}
-                />
-              </div>
-            )}
-
             {/* Fiscal Year dropdown — shown for both roles */}
             {config.hasFiscalYearFilter && (
               <div className="space-y-1.5 sm:col-span-2">
@@ -228,6 +254,103 @@ export function ReportRequestForm({ userRole }: ReportRequestFormProps) {
                 </select>
               </div>
             )}
+
+            {/* ---- For ADMIN: Member Selection Box ---- */}
+            {config.hasTrecHolderFilter && isAdmin && (
+              <div className="space-y-3 sm:col-span-2 rounded-2xl border bg-muted/20 p-5">
+                <div className="flex items-center justify-between gap-2">
+                  <div className="flex items-center gap-2">
+                    <Users className="w-4 h-4 text-primary" />
+                    <label className={labelClass}>Select Members for Batch Generation</label>
+                  </div>
+                  <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-primary/10 text-primary">
+                    {selectedMemberIds.length} of {membersList.length} Selected
+                  </span>
+                </div>
+
+                {/* Search & Select All controls */}
+                <div className="flex items-center gap-3">
+                  <div className="relative flex-1">
+                    <Search className="w-3.5 h-3.5 absolute left-3 top-2.5 text-muted-foreground" />
+                    <input
+                      type="text"
+                      placeholder="Search member ID, code, or name..."
+                      value={memberSearchText}
+                      onChange={(e) => setMemberSearchText(e.target.value)}
+                      className="w-full rounded-xl border border-border bg-background pl-9 pr-3 py-2 text-xs text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-primary/30"
+                    />
+                  </div>
+                  <button
+                    type="button"
+                    onClick={handleToggleSelectAll}
+                    className="inline-flex items-center gap-1.5 rounded-xl border border-primary/30 bg-primary/10 hover:bg-primary/20 text-primary px-3 py-2 text-xs font-medium transition-colors shrink-0"
+                  >
+                    {selectedMemberIds.length === membersList.length ? (
+                      <>
+                        <Square className="w-3.5 h-3.5" /> Deselect All
+                      </>
+                    ) : (
+                      <>
+                        <CheckSquare className="w-3.5 h-3.5" /> Select All ({membersList.length})
+                      </>
+                    )}
+                  </button>
+                </div>
+
+                {/* Member Checkboxes Scroll Area */}
+                <div className="max-h-48 overflow-y-auto rounded-xl border border-border/80 bg-background p-2 space-y-1">
+                  {filteredMembers.length === 0 ? (
+                    <p className="text-xs text-muted-foreground text-center py-4">
+                      No members found matching &ldquo;{memberSearchText}&rdquo;
+                    </p>
+                  ) : (
+                    filteredMembers.map((m) => {
+                      const isChecked = selectedMemberIds.includes(m.memberId);
+                      return (
+                        <label
+                          key={m.memberId}
+                          className={cn(
+                            "flex items-center gap-2.5 rounded-lg px-3 py-1.5 text-xs transition-colors cursor-pointer",
+                            isChecked
+                              ? "bg-primary/10 text-primary font-medium"
+                              : "hover:bg-accent/50 text-foreground"
+                          )}
+                        >
+                          <input
+                            type="checkbox"
+                            checked={isChecked}
+                            onChange={() => handleToggleMember(m.memberId)}
+                            className="rounded border-border text-primary focus:ring-primary h-3.5 w-3.5"
+                          />
+                          <span className="font-semibold shrink-0">[{m.memberId}]</span>
+                          <span className="truncate flex-1">{m.memberName}</span>
+                          {m.memberCode && m.memberCode !== m.memberId && (
+                            <span className="text-muted-foreground text-[10px] shrink-0">
+                              ({m.memberCode})
+                            </span>
+                          )}
+                        </label>
+                      );
+                    })
+                  )}
+                </div>
+
+                {/* Optional single member fallback input */}
+                <div className="pt-2 border-t border-border/50">
+                  <label className="text-[11px] text-muted-foreground">
+                    Or specify a single TREC Holder ID directly:
+                  </label>
+                  <input
+                    id="trecHolderId"
+                    type="text"
+                    placeholder="e.g. 121001"
+                    value={trecHolderId}
+                    onChange={(e) => setTrecHolderId(e.target.value)}
+                    className="mt-1 w-full rounded-xl border border-border bg-background px-3 py-1.5 text-xs text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-primary/30"
+                  />
+                </div>
+              </div>
+            )}
           </div>
         </div>
       )}
@@ -235,53 +358,85 @@ export function ReportRequestForm({ userRole }: ReportRequestFormProps) {
       {/* Submit buttons */}
       <div className="flex flex-wrap items-center justify-end gap-3">
         {isAdmin && reportType === "trec_holder_tax_certificate" && (
+          <>
+            {/* Generate for Selected Members */}
+            {selectedMemberIds.length > 0 && (
+              <button
+                type="button"
+                onClick={() => handleGenerate(false)}
+                disabled={isPending}
+                className={cn(
+                  "inline-flex items-center gap-2 rounded-xl px-6 py-3 text-sm font-semibold transition-all duration-200",
+                  "bg-primary text-primary-foreground shadow-sm hover:bg-primary/90 hover:shadow-md hover:-translate-y-0.5",
+                  "disabled:opacity-60 disabled:cursor-not-allowed"
+                )}
+              >
+                {isPending ? (
+                  <>
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                    Generating...
+                  </>
+                ) : (
+                  <>
+                    <Users className="w-4 h-4" />
+                    Generate for Selected ({selectedMemberIds.length})
+                  </>
+                )}
+              </button>
+            )}
+
+            {/* Generate for All Members */}
+            <button
+              type="button"
+              onClick={() => handleGenerate(true)}
+              disabled={isPending}
+              className={cn(
+                "inline-flex items-center gap-2 rounded-xl px-6 py-3 text-sm font-semibold transition-all duration-200",
+                "bg-emerald-600 text-white shadow-sm hover:bg-emerald-700 hover:shadow-md hover:-translate-y-0.5",
+                "disabled:opacity-60 disabled:cursor-not-allowed"
+              )}
+            >
+              {isPending ? (
+                <>
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                  Generating for All...
+                </>
+              ) : (
+                <>
+                  <Users className="w-4 h-4" />
+                  Generate for All ({membersList.length})
+                </>
+              )}
+            </button>
+          </>
+        )}
+
+        {/* Standard / TRECHOLDER generate button */}
+        {(!isAdmin || selectedMemberIds.length === 0) && (
           <button
             type="button"
-            onClick={() => handleGenerate(true)}
+            onClick={() => handleGenerate(false)}
             disabled={isPending}
             className={cn(
-              "inline-flex items-center gap-2 rounded-xl px-6 py-3 text-sm font-semibold transition-all duration-200",
-              "bg-emerald-600 text-white shadow-sm hover:bg-emerald-700 hover:shadow-md hover:-translate-y-0.5",
+              "inline-flex items-center gap-2 rounded-xl px-8 py-3 text-sm font-semibold transition-all duration-200",
+              "bg-primary text-primary-foreground shadow-sm",
+              "hover:bg-primary/90 hover:shadow-md hover:-translate-y-0.5",
               "disabled:opacity-60 disabled:cursor-not-allowed"
             )}
           >
             {isPending ? (
               <>
                 <Loader2 className="w-4 h-4 animate-spin" />
-                Generating for All Members...
+                Queuing Report...
               </>
             ) : (
               <>
-                <Users className="w-4 h-4" />
-                Generate for All Members (Single Click)
+                <FileBarChart className="w-4 h-4" />
+                {isTrecHolder ? `Generate ${format} Report` : `Generate Individual Report (${format})`}
               </>
             )}
           </button>
         )}
-
-        <button
-          type="button"
-          onClick={() => handleGenerate(false)}
-          disabled={isPending}
-          className={cn(
-            "inline-flex items-center gap-2 rounded-xl px-8 py-3 text-sm font-semibold transition-all duration-200",
-            "bg-primary text-primary-foreground shadow-sm",
-            "hover:bg-primary/90 hover:shadow-md hover:-translate-y-0.5",
-            "disabled:opacity-60 disabled:cursor-not-allowed"
-          )}
-        >
-          {isPending ? (
-            <>
-              <Loader2 className="w-4 h-4 animate-spin" />
-              Queuing Report...
-            </>
-          ) : (
-            <>
-              <FileBarChart className="w-4 h-4" />
-              {isTrecHolder ? `Generate ${format} Report` : `Generate Individual Report (${format})`}
-            </>
-          )}
-        </button>
       </div>
     </form>
   );

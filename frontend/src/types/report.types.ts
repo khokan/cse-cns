@@ -55,6 +55,7 @@ export interface CreateReportJobPayload {
     trecHolderId?: string;
     fiscalYear?: string;
     isBulk?: boolean;
+    selectedMemberIds?: string[];
   };
 }
 
