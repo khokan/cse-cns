@@ -13,9 +13,6 @@ export type ReportFormat = "PDF" | "XLSX" | "CSV";
 
 export type ReportType =
     | "member_list"
-    | "trec_holder_summary"
-    | "user_activity"
-    | "financial_summary"
     | "trec_holder_tax_certificate";
 
 // ---------------------------------------------------------------------------

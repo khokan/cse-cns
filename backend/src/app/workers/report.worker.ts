@@ -21,9 +21,6 @@ import type {
 
 const REPORT_TITLES: Record<string, string> = {
     member_list: "Member Listing Report",
-    trec_holder_summary: "TrecHolder Summary Report",
-    user_activity: "User Activity Report",
-    financial_summary: "Financial Summary Report",
     trec_holder_tax_certificate: "Certificate of Collection of Tax",
 };
 
@@ -346,9 +343,6 @@ async function fetchData(
 ): Promise<Record<string, unknown>[]> {
     switch (reportType) {
         case "member_list": return fetchMemberList(filters);
-        case "trec_holder_summary": return fetchTrecHolderSummary(filters);
-        case "user_activity": return fetchUserActivity(filters);
-        case "financial_summary": return fetchFinancialSummary(filters);
         case TAX_CERT: return fetchTaxCertificate(filters);
         default: throw new Error(`Unknown report type: ${reportType}`);
     }

@@ -47,7 +47,7 @@ const requestReport = async (
         ? filters.selectedMemberIds
         : null;
 
-    if ((filters.isBulk || selectedMemberIds) && dto.reportType === "trec_holder_tax_certificate") {
+    if (filters.isBulk || selectedMemberIds) {
         const whereClause = selectedMemberIds
             ? { MemberID: { in: selectedMemberIds } }
             : {};
@@ -96,9 +96,9 @@ const requestReport = async (
 
             const bQueueJobId = uuidv4();
             const memberFilters = {
-                fiscalYear: filters.fiscalYear,
+                ...filters,
                 trecHolderId: memberId,
-                memberCode: m.MemberCode,
+                memberCode: m.MemberCode ?? memberId,
             };
 
             const reportJob = await db.cnsWeb.reportJob.create({

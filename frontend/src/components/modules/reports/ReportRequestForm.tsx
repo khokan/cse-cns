@@ -1,10 +1,11 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
-import { FileBarChart, Loader2, Filter, Users, CheckSquare, Square, Search } from "lucide-react";
+import { FileBarChart, Loader2, Filter, Users } from "lucide-react";
 import { ReportTypeSelector } from "./ReportTypeSelector";
+import { MemberSelectBox } from "./MemberSelectBox";
 import { useRequestReport, useMembersList } from "@/hooks/useReportJobs";
 import { REPORT_TYPE_CONFIGS } from "@/constants/reportConstants";
 import type { ReportFormat, ReportType } from "@/types/report.types";
@@ -31,7 +32,7 @@ export function ReportRequestForm({ userRole }: ReportRequestFormProps) {
   const isAdmin = ["ADMIN", "IT"].includes(userRole ?? "");
   const isTrecHolder = userRole === "TRECHOLDER";
 
-  // Fetch members list for selection box when Admin
+  // Fetch members list count for button labels
   const { data: membersList = [] } = useMembersList(isAdmin);
 
   // Form state
@@ -47,35 +48,8 @@ export function ReportRequestForm({ userRole }: ReportRequestFormProps) {
 
   // Selection box state for ADMIN
   const [selectedMemberIds, setSelectedMemberIds] = useState<string[]>([]);
-  const [memberSearchText, setMemberSearchText] = useState("");
 
   const config = REPORT_TYPE_CONFIGS.find((c) => c.id === reportType)!;
-
-  // Filter members list based on search text
-  const filteredMembers = useMemo(() => {
-    if (!memberSearchText.trim()) return membersList;
-    const q = memberSearchText.toLowerCase();
-    return membersList.filter(
-      (m) =>
-        m.memberId.toLowerCase().includes(q) ||
-        m.memberCode.toLowerCase().includes(q) ||
-        m.memberName.toLowerCase().includes(q)
-    );
-  }, [membersList, memberSearchText]);
-
-  const handleToggleMember = (memberId: string) => {
-    setSelectedMemberIds((prev) =>
-      prev.includes(memberId) ? prev.filter((id) => id !== memberId) : [...prev, memberId]
-    );
-  };
-
-  const handleToggleSelectAll = () => {
-    if (selectedMemberIds.length === membersList.length) {
-      setSelectedMemberIds([]);
-    } else {
-      setSelectedMemberIds(membersList.map((m) => m.memberId));
-    }
-  };
 
   const handleGenerate = (isBulk: boolean = false) => {
     if (config.hasFiscalYearFilter && !fiscalYear.trim()) {
@@ -141,7 +115,8 @@ export function ReportRequestForm({ userRole }: ReportRequestFormProps) {
     config.hasRegionFilter ||
     config.hasSearchFilter ||
     config.hasTrecHolderFilter ||
-    config.hasFiscalYearFilter;
+    config.hasFiscalYearFilter ||
+    isAdmin;
 
   return (
     <form onSubmit={(e) => e.preventDefault()} className="space-y-8">
@@ -255,100 +230,31 @@ export function ReportRequestForm({ userRole }: ReportRequestFormProps) {
               </div>
             )}
 
-            {/* ---- For ADMIN: Member Selection Box ---- */}
+            {/* ---- Reusable Member Selection Box for ADMIN ---- */}
+            {isAdmin && (
+              <div className="sm:col-span-2">
+                <MemberSelectBox
+                  selectedMemberIds={selectedMemberIds}
+                  onChange={setSelectedMemberIds}
+                />
+              </div>
+            )}
+
+            {/* Optional single member fallback input for ADMIN */}
             {config.hasTrecHolderFilter && isAdmin && (
-              <div className="space-y-3 sm:col-span-2 rounded-2xl border bg-muted/20 p-5">
-                <div className="flex items-center justify-between gap-2">
-                  <div className="flex items-center gap-2">
-                    <Users className="w-4 h-4 text-primary" />
-                    <label className={labelClass}>Select Members for Batch Generation</label>
-                  </div>
-                  <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-primary/10 text-primary">
-                    {selectedMemberIds.length} of {membersList.length} Selected
-                  </span>
-                </div>
-
-                {/* Search & Select All controls */}
-                <div className="flex items-center gap-3">
-                  <div className="relative flex-1">
-                    <Search className="w-3.5 h-3.5 absolute left-3 top-2.5 text-muted-foreground" />
-                    <input
-                      type="text"
-                      placeholder="Search member ID, code, or name..."
-                      value={memberSearchText}
-                      onChange={(e) => setMemberSearchText(e.target.value)}
-                      className="w-full rounded-xl border border-border bg-background pl-9 pr-3 py-2 text-xs text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-primary/30"
-                    />
-                  </div>
-                  <button
-                    type="button"
-                    onClick={handleToggleSelectAll}
-                    className="inline-flex items-center gap-1.5 rounded-xl border border-primary/30 bg-primary/10 hover:bg-primary/20 text-primary px-3 py-2 text-xs font-medium transition-colors shrink-0"
-                  >
-                    {selectedMemberIds.length === membersList.length ? (
-                      <>
-                        <Square className="w-3.5 h-3.5" /> Deselect All
-                      </>
-                    ) : (
-                      <>
-                        <CheckSquare className="w-3.5 h-3.5" /> Select All ({membersList.length})
-                      </>
-                    )}
-                  </button>
-                </div>
-
-                {/* Member Checkboxes Scroll Area */}
-                <div className="max-h-48 overflow-y-auto rounded-xl border border-border/80 bg-background p-2 space-y-1">
-                  {filteredMembers.length === 0 ? (
-                    <p className="text-xs text-muted-foreground text-center py-4">
-                      No members found matching &ldquo;{memberSearchText}&rdquo;
-                    </p>
-                  ) : (
-                    filteredMembers.map((m) => {
-                      const isChecked = selectedMemberIds.includes(m.memberId);
-                      return (
-                        <label
-                          key={m.memberId}
-                          className={cn(
-                            "flex items-center gap-2.5 rounded-lg px-3 py-1.5 text-xs transition-colors cursor-pointer",
-                            isChecked
-                              ? "bg-primary/10 text-primary font-medium"
-                              : "hover:bg-accent/50 text-foreground"
-                          )}
-                        >
-                          <input
-                            type="checkbox"
-                            checked={isChecked}
-                            onChange={() => handleToggleMember(m.memberId)}
-                            className="rounded border-border text-primary focus:ring-primary h-3.5 w-3.5"
-                          />
-                          <span className="font-semibold shrink-0">[{m.memberId}]</span>
-                          <span className="truncate flex-1">{m.memberName}</span>
-                          {m.memberCode && m.memberCode !== m.memberId && (
-                            <span className="text-muted-foreground text-[10px] shrink-0">
-                              ({m.memberCode})
-                            </span>
-                          )}
-                        </label>
-                      );
-                    })
-                  )}
-                </div>
-
-                {/* Optional single member fallback input */}
-                <div className="pt-2 border-t border-border/50">
-                  <label className="text-[11px] text-muted-foreground">
-                    Or specify a single TREC Holder ID directly:
-                  </label>
-                  <input
-                    id="trecHolderId"
-                    type="text"
-                    placeholder="e.g. 121001"
-                    value={trecHolderId}
-                    onChange={(e) => setTrecHolderId(e.target.value)}
-                    className="mt-1 w-full rounded-xl border border-border bg-background px-3 py-1.5 text-xs text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-primary/30"
-                  />
-                </div>
+              <div className="space-y-1.5 sm:col-span-2">
+                <label className={labelClass}>
+                  Or Specify Single TREC Holder ID
+                  <span className="ml-1 text-xs text-muted-foreground font-normal">(optional fallback)</span>
+                </label>
+                <input
+                  id="trecHolderId"
+                  type="text"
+                  placeholder="e.g. 121001"
+                  value={trecHolderId}
+                  onChange={(e) => setTrecHolderId(e.target.value)}
+                  className={inputClass}
+                />
               </div>
             )}
           </div>
@@ -357,7 +263,7 @@ export function ReportRequestForm({ userRole }: ReportRequestFormProps) {
 
       {/* Submit buttons */}
       <div className="flex flex-wrap items-center justify-end gap-3">
-        {isAdmin && reportType === "trec_holder_tax_certificate" && (
+        {isAdmin && (
           <>
             {/* Generate for Selected Members */}
             {selectedMemberIds.length > 0 && (
