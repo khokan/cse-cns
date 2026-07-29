@@ -61,7 +61,7 @@ const getReceivableSummary = async (date?: string): Promise<ReceivableSummary> =
         if (!rows || rows.length === 0) {
             throw new AppError(
                 status.NOT_FOUND,
-                `usp_Reconciliation_ReceivableSummary returned no data for ${resolvedDate}.`
+                `Reconciliation_Receivable_Summary returned no data for ${resolvedDate}.`
             );
         }
 
@@ -74,7 +74,7 @@ const getReceivableSummary = async (date?: string): Promise<ReceivableSummary> =
         };
     } catch (error) {
         if (error instanceof AppError) throw error;
-        logger.error("Failed to execute usp_Reconciliation_ReceivableSummary", error, { date: resolvedDate });
+        logger.error("Failed to execute Reconciliation_ReceivableSummary", error, { date: resolvedDate });
         throw new AppError(
             status.INTERNAL_SERVER_ERROR,
             "Failed to fetch receivable summary from the database."
@@ -95,7 +95,7 @@ const getTransactionSummary = async (date?: string): Promise<TransactionSummaryR
         if (!rows) {
             throw new AppError(
                 status.NOT_FOUND,
-                `usp_Reconciliation_TransactionSummary returned no data for ${resolvedDate}.`
+                `Reconciliation_TransactionSummary returned no data for ${resolvedDate}.`
             );
         }
 
@@ -114,7 +114,7 @@ const getTransactionSummary = async (date?: string): Promise<TransactionSummaryR
         });
     } catch (error) {
         if (error instanceof AppError) throw error;
-        logger.error("Failed to execute usp_Reconciliation_TransactionSummary", error, { date: resolvedDate });
+        logger.error("Failed to execute Reconciliation_TransactionSummary", error, { date: resolvedDate });
         throw new AppError(
             status.INTERNAL_SERVER_ERROR,
             "Failed to fetch transaction summary from the database."
@@ -135,7 +135,7 @@ const getCashFlowSummary = async (date?: string): Promise<CashFlowSummaryRow[]> 
         if (!rows) {
             throw new AppError(
                 status.NOT_FOUND,
-                `usp_Reconciliation_CashFlowSummary returned no data for ${resolvedDate}.`
+                `Reconciliation_CashFlowSummary returned no data for ${resolvedDate}.`
             );
         }
 
@@ -150,7 +150,7 @@ const getCashFlowSummary = async (date?: string): Promise<CashFlowSummaryRow[]> 
         }));
     } catch (error) {
         if (error instanceof AppError) throw error;
-        logger.error("Failed to execute usp_Reconciliation_CashFlowSummary", error, { date: resolvedDate });
+        logger.error("Failed to execute Reconciliation_CashFlowSummary", error, { date: resolvedDate });
         throw new AppError(
             status.INTERNAL_SERVER_ERROR,
             "Failed to fetch cash flow summary from the database."

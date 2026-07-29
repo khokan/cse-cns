@@ -48,26 +48,6 @@ async function fetchMemberList(filters: Filters): Promise<Record<string, unknown
     }));
 }
 
-async function fetchTrecHolderSummary(filters: Filters): Promise<Record<string, unknown>[]> {
-    const holders = await db.cnsWeb.trecHolder.findMany({
-        where: {
-            isDeleted: false,
-            ...(filters.search
-                ? { OR: [{ name: { contains: filters.search as string } }, { email: { contains: filters.search as string } }] }
-                : {}),
-        },
-        orderBy: { createdAt: "desc" },
-    });
-
-    return holders.map((h) => ({
-        "ID": h.id,
-        "Name": h.name,
-        "Email": h.email,
-        "Contact": h.contactNumber ?? "",
-        "Address": h.address ?? "",
-        "Created At": h.createdAt.toISOString().split("T")[0],
-    }));
-}
 
 async function fetchUserActivity(filters: Filters): Promise<Record<string, unknown>[]> {
     const sessions = await db.cnsWeb.session.findMany({
@@ -220,7 +200,7 @@ async function fetchTaxCertificate(filters: Filters): Promise<Record<string, unk
     // 3. Execute stored procedure
     //    EXEC [dbo].[USP_Certificate_Show] @FromDate = '...', @ToDate = '...', @MemberID = '...'
     // -----------------------------------------------------------------------
-    console.log(`📋 [TaxCert] Calling USP_Certificate_Show | MemberID=${memberId} | ${fromDate} → ${toDate}`);
+    console.log(`📋 [TaxCert] Calling Certificate_Show | MemberID=${memberId} | ${fromDate} → ${toDate}`);
 
     const rows = await db.cns.$queryRawUnsafe<SpRawRow[]>(
         `EXEC [dbo].[USP_Certificate_Show] @FromDate = '${fromDate}', @ToDate = '${toDate}', @MemberID = '${memberId}'`
@@ -228,7 +208,7 @@ async function fetchTaxCertificate(filters: Filters): Promise<Record<string, unk
 
     if (!rows || rows.length === 0) {
         throw new Error(
-            `USP_Certificate_Show returned no data for MemberID="${memberId}", ${fromDate} → ${toDate}.`
+            `Certificate_Show returned no data for MemberID="${memberId}", ${fromDate} → ${toDate}.`
         );
     }
 

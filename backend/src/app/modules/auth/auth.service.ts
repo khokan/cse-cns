@@ -175,16 +175,16 @@ const resetPassword = async (email: string, otp: string, newPassword: string) =>
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const googleLoginSuccess = async (session: Record<string, any>) => {
-    const isTrecHolderExists = await prisma.trecHolder.findUnique({
+    const isUserExists = await prisma.user.findUnique({
         where: {
-            userId: session.user.id,
+            id: session.user.id,
         },
     });
 
-    if (!isTrecHolderExists) {
-        await prisma.trecHolder.create({
+    if (!isUserExists) {
+        await prisma.user.create({
             data: {
-                userId: session.user.id,
+                id: session.user.id,
                 name: session.user.name,
                 email: session.user.email,
             },
