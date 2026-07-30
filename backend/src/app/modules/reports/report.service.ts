@@ -1,8 +1,9 @@
 import { v4 as uuidv4 } from "uuid";
 import { db } from "../../lib/prisma.js";
 import { enqueueReportJob } from "../../queues/report.queue.js";
-import { processReportJob } from "../../workers/report.worker.js";
 import { storageLib } from "../../lib/storage.js";
+import { reportCache } from "../../lib/redis.js";
+import { writeAuditLog } from "../../utils/auditLog.js";
 import AppError from "../../errorHelpers/AppError.js";
 import status from "http-status";
 import type {
@@ -14,14 +15,10 @@ import type {
 
 const MAX_ACTIVE_JOBS_PER_USER = 5;
 
-// ---------------------------------------------------------------------------
-// requestReport — validates, creates DB record, enqueues the job
-// ---------------------------------------------------------------------------
 const requestReport = async (
     userId: string,
     dto: CreateReportJobDto
 ) => {
-    // Rate-limit: cap active jobs per user
     const activeCount = await db.cnsWeb.reportJob.count({
         where: {
             userId,
@@ -39,10 +36,6 @@ const requestReport = async (
     const queueJobId = uuidv4();
     const filters = dto.filters ?? {};
 
-    // -----------------------------------------------------------------------
-    // BATCH / SELECTION / BULK GENERATION FOR ADMIN
-    // Admin selects specific members or clicks all members to generate tax certificates
-    // -----------------------------------------------------------------------
     const selectedMemberIds = Array.isArray(filters.selectedMemberIds) && filters.selectedMemberIds.length > 0
         ? filters.selectedMemberIds
         : null;
@@ -61,7 +54,6 @@ const requestReport = async (
             throw new AppError(status.NOT_FOUND, "No matching members found in the Member table.");
         }
 
-        // Map member EmailAddress or trecHolderId -> User id
         const users = await db.cnsWeb.user.findMany({
             select: { id: true, email: true, trecHolderId: true },
         });
@@ -112,18 +104,23 @@ const requestReport = async (
                 },
             });
 
-            enqueueReportJob(async () => {
-                await processReportJob({
-                    reportJobId: reportJob.id,
-                    userId: targetUserId,
-                    reportType: dto.reportType,
-                    format: dto.format,
-                    filters: memberFilters,
-                });
+            await enqueueReportJob({
+                reportJobId: reportJob.id,
+                userId: targetUserId,
+                reportType: dto.reportType,
+                format: dto.format,
+                filters: memberFilters,
             });
 
             createdCount++;
         }
+
+        writeAuditLog({
+            userId,
+            action: "REPORT_REQUESTED",
+            entity: "ReportJob",
+            payload: { reportType: dto.reportType, bulkCount: createdCount },
+        });
 
         return {
             jobId: "bulk-batch",
@@ -137,7 +134,6 @@ const requestReport = async (
         };
     }
 
-    // Single report job request — if trecHolderId is missing, resolve MemberID / trecHolderId for logged-in TRECHOLDER
     if (dto.reportType === "trec_holder_tax_certificate" && !filters.trecHolderId) {
         const user = await db.cnsWeb.user.findUnique({ where: { id: userId } });
         if (user?.trecHolderId) {
@@ -152,7 +148,6 @@ const requestReport = async (
         }
     }
 
-    // Verify user exists before creating report job
     const requestingUser = await db.cnsWeb.user.findUnique({
         where: { id: userId },
         select: { id: true, trecHolderId: true },
@@ -161,7 +156,6 @@ const requestReport = async (
         throw new AppError(status.UNAUTHORIZED, "User account not found. Please log in again.");
     }
 
-    // Target userId for job: if trecHolderId is specified (e.g. by admin), attempt matching to user account
     let jobTargetUserId = userId;
     if (filters.trecHolderId) {
         const targetUser = await db.cnsWeb.user.findFirst({
@@ -178,7 +172,6 @@ const requestReport = async (
         }
     }
 
-    // Verify jobTargetUserId exists in User table
     const targetUserExists = await db.cnsWeb.user.findUnique({
         where: { id: jobTargetUserId },
         select: { id: true },
@@ -187,7 +180,6 @@ const requestReport = async (
         jobTargetUserId = userId;
     }
 
-    // Create DB record
     const reportJob = await db.cnsWeb.reportJob.create({
         data: {
             userId: jobTargetUserId,
@@ -199,15 +191,20 @@ const requestReport = async (
         },
     });
 
-    // Enqueue the background job
-    enqueueReportJob(async () => {
-        await processReportJob({
-            reportJobId: reportJob.id,
-            userId: jobTargetUserId,
-            reportType: dto.reportType,
-            format: dto.format,
-            filters,
-        });
+    await enqueueReportJob({
+        reportJobId: reportJob.id,
+        userId: jobTargetUserId,
+        reportType: dto.reportType,
+        format: dto.format,
+        filters,
+    });
+
+    writeAuditLog({
+        userId,
+        action: "REPORT_REQUESTED",
+        entity: "ReportJob",
+        entityId: reportJob.id,
+        payload: { reportType: dto.reportType, format: dto.format, filters },
     });
 
     return {
@@ -217,14 +214,10 @@ const requestReport = async (
         reportType: dto.reportType,
         format: dto.format,
         requestedAt: reportJob.requestedAt,
-        estimatedWait: 10, // seconds — rough estimate
+        estimatedWait: 10,
     };
 };
 
-// ---------------------------------------------------------------------------
-// getJobs — paginated list, scoped to user (or all for ADMIN/IT)
-// Matches by userId OR trecHolderId found in filters JSON column!
-// ---------------------------------------------------------------------------
 const getJobs = async (
     userId: string,
     userRole: string,
@@ -283,10 +276,13 @@ const getJobs = async (
     };
 };
 
-// ---------------------------------------------------------------------------
-// getJob — single job, scoped ownership check
-// ---------------------------------------------------------------------------
 const getJob = async (jobId: string, userId: string, userRole: string) => {
+    // Check Redis cache for polling optimization
+    const cachedJob = await reportCache.getJob<any>(jobId);
+    if (cachedJob) {
+        return cachedJob;
+    }
+
     const job = await db.cnsWeb.reportJob.findUnique({
         where: { id: jobId },
         include: { user: { select: { name: true, email: true } } },
@@ -313,12 +309,10 @@ const getJob = async (jobId: string, userId: string, userRole: string) => {
         );
     }
 
+    await reportCache.setJob(jobId, job);
     return job;
 };
 
-// ---------------------------------------------------------------------------
-// cancelJob — TRECHOLDER can cancel their OWN pending/processing job
-// ---------------------------------------------------------------------------
 const cancelJob = async (
     jobId: string,
     userId: string,
@@ -349,40 +343,47 @@ const cancelJob = async (
         await storageLib.deleteReport(updated.filePath);
     }
 
+    await reportCache.invalidateJob(jobId);
+    writeAuditLog({
+        userId,
+        action: "REPORT_CANCELLED",
+        entity: "ReportJob",
+        entityId: jobId,
+    });
+
     return updated;
 };
 
-// ---------------------------------------------------------------------------
-// deleteJob — ADMIN/IT can delete any report job and purge its file
-// TRECHOLDER calling delete will trigger cancelJob for pending/processing jobs
-// ---------------------------------------------------------------------------
 const deleteJob = async (
     jobId: string,
     userId: string,
     userRole: string
 ) => {
     const job = await getJob(jobId, userId, userRole);
-
     const isAdminOrIT = ["ADMIN", "IT"].includes(userRole);
 
     if (isAdminOrIT) {
-        // ADMIN can delete ANY report job permanently (and remove file from disk)
         if (job.filePath) {
             await storageLib.deleteReport(job.filePath);
         }
         const deleted = await db.cnsWeb.reportJob.delete({
             where: { id: jobId },
         });
+
+        await reportCache.invalidateJob(jobId);
+        writeAuditLog({
+            userId,
+            action: "REPORT_DELETED",
+            entity: "ReportJob",
+            entityId: jobId,
+        });
+
         return deleted;
     }
 
-    // Non-admin (TRECHOLDER) attempts cancel instead
     return cancelJob(jobId, userId, userRole);
 };
 
-// ---------------------------------------------------------------------------
-// getJobForDownload — validates ownership + file readiness
-// ---------------------------------------------------------------------------
 const getJobForDownload = async (
     jobId: string,
     userId: string,
@@ -408,10 +409,6 @@ const getJobForDownload = async (
     return job;
 };
 
-// ---------------------------------------------------------------------------
-// deleteAllJobs — ADMIN bulk deletion of all report jobs matching filter
-// Deletes files from disk storage and purges DB records
-// ---------------------------------------------------------------------------
 const deleteAllJobs = async (
     userId: string,
     userRole: string,
@@ -427,31 +424,38 @@ const deleteAllJobs = async (
         ...(statusFilter && statusFilter !== "ALL" ? { status: statusFilter as ReportStatus } : {}),
     };
 
-    // 1. Fetch matching jobs to clean up files on disk
     const jobs = await db.cnsWeb.reportJob.findMany({
         where,
         select: { id: true, filePath: true },
     });
 
-    // 2. Delete all files from storage disk
     for (const job of jobs) {
         if (job.filePath) {
             await storageLib.deleteReport(job.filePath);
+            await reportCache.invalidateJob(job.id);
         }
     }
 
-    // 3. Purge DB records in bulk
     const result = await db.cnsWeb.reportJob.deleteMany({ where });
+
+    writeAuditLog({
+        userId,
+        action: "REPORT_DELETED",
+        entity: "ReportJob",
+        payload: { bulkCount: result.count, reportType, statusFilter },
+    });
 
     return {
         count: result.count,
     };
 };
 
-// ---------------------------------------------------------------------------
-// getMembersList — returns list of members for Admin multi-selection UI
-// ---------------------------------------------------------------------------
 const getMembersList = async () => {
+    const cachedMembers = await reportCache.getMembersList<any[]>();
+    if (cachedMembers) {
+        return cachedMembers;
+    }
+
     const members = await db.cnsWeb.member.findMany({
         select: {
             MemberID: true,
@@ -461,11 +465,14 @@ const getMembersList = async () => {
         orderBy: { MemberID: "asc" },
     });
 
-    return members.map((m) => ({
+    const result = members.map((m) => ({
         memberId: m.MemberID,
         memberCode: m.MemberCode,
         memberName: m.MemberName ?? m.MemberCode ?? m.MemberID,
     }));
+
+    await reportCache.setMembersList(result);
+    return result;
 };
 
 export const ReportService = {

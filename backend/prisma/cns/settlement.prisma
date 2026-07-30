@@ -1,0 +1,17 @@
+model Settlement {
+  TradeDate      DateTime? @db.DateTime
+  ContractNumber String    @db.VarChar(50)
+  ScripID        String?   @db.VarChar(50)
+  BuyBrokerCode  String?   @db.VarChar(50)
+  BuyTraderCode  String?   @db.VarChar(50)
+  BuyOrdType     String?   @db.VarChar(10)
+  SellBrokerCode String?   @db.VarChar(50)
+  SellTraderCode String?   @db.VarChar(50)
+  SellOrdType    String?   @db.VarChar(10)
+  Quantity       Int?
+  Price          Decimal?  @db.Decimal(38, 4)
+  ProcessType    String?   @db.VarChar(10)
+  TradeTime      String?   @db.VarChar(50)
+
+  @@id([ContractNumber], map: "PK_Settlement")
+}

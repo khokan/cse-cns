@@ -34,6 +34,8 @@ interface EnvConfig {
     REPORTS_UPLOAD_DIR: string;
     REPORTS_BASE_URL: string;
     REPORT_QUEUE_CONCURRENCY: number;
+    REDIS_URL: string;
+    SOCKET_CORS_ORIGIN: string;
 }
 
 
@@ -104,6 +106,8 @@ const loadEnvVariables = (): EnvConfig => {
         REPORTS_UPLOAD_DIR: process.env.REPORTS_UPLOAD_DIR as string,
         REPORTS_BASE_URL: process.env.REPORTS_BASE_URL as string,
         REPORT_QUEUE_CONCURRENCY: parseInt(process.env.REPORT_QUEUE_CONCURRENCY || '2', 10),
+        REDIS_URL: process.env.REDIS_URL || 'redis://localhost:6379',
+        SOCKET_CORS_ORIGIN: process.env.SOCKET_CORS_ORIGIN || 'http://localhost:3000',
     }
 }
 

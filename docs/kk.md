@@ -28,3 +28,11 @@ nssm status cns-web-service
 ```
 6. add website binding in IIS for the domain name (e.g., cnsweb.com) and point it to the backend service. You can do this by right-clicking on the website node in the left pane, selecting "Edit Bindings", and adding a new binding with the desired hostname and port (e.g., 80 or 443 for HTTPS).
 7. Finally, you need to configure the backend service to run as a Windows service. You can do this by opening the Services app in Windows, finding the "cns-web-service" service, right-clicking on it, and selecting "Properties". In the "General" tab, set the "Startup type" to "Automatic" and click "OK". This will ensure that the backend service starts automatically when the server is restarted.
+--------------REDIS-----------
+CONFIG GET bind
+CONFIG GET protected-mode
+--------------
+CONFIG SET requirepass yourPassword
+CONFIG REWRITE
+REDIS_URL=redis://:yourPassword@192.168.105.44:6379
+-----------------

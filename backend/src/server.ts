@@ -1,8 +1,12 @@
 import { Server } from "http";
-import app from "./app";
-import { envVars } from "./app/config/env";
-import { db } from "./app/lib/prisma";
-import { seedSuperAdmin } from "./app/utils/seed";
+import app from "./app.js";
+import { envVars } from "./app/config/env.js";
+import { db } from "./app/lib/prisma.js";
+import { seedSuperAdmin } from "./app/utils/seed.js";
+import { initSocketServer } from "./app/lib/socket.js";
+import { initReportWorker, reportWorker } from "./app/workers/report.worker.js";
+import { initSettlementWorker, settlementWorker } from "./app/workers/settlement.worker.js";
+import { redisClient } from "./app/lib/redis.js";
 
 let server: Server;
 
@@ -17,6 +21,14 @@ const bootstrap = async () => {
         server = app.listen(envVars.PORT, () => {
             console.log(`🚀 Server running on http://localhost:${envVars.PORT}`);
         });
+
+        // Initialize Socket.IO server
+        initSocketServer(server);
+
+        // Initialize BullMQ Workers
+        initReportWorker();
+        initSettlementWorker();
+        console.log("⚙️  [Workers] ReportWorker and SettlementWorker started successfully.");
     } catch (error) {
         console.error("❌ Failed to start server:", error);
         process.exit(1);
@@ -28,6 +40,10 @@ const gracefulShutdown = async (signal: string, error?: unknown) => {
     if (error) {
         console.error("Error details:", error);
     }
+
+    if (reportWorker) await reportWorker.close();
+    if (settlementWorker) await settlementWorker.close();
+    if (redisClient) redisClient.disconnect();
 
     if (server) {
         server.close(async () => {
@@ -52,11 +68,8 @@ const gracefulShutdown = async (signal: string, error?: unknown) => {
     }
 };
 
-// Process Termination Signal Handlers
 process.on("SIGTERM", () => gracefulShutdown("SIGTERM"));
 process.on("SIGINT", () => gracefulShutdown("SIGINT"));
-
-// Unhandled Exception & Rejection Handlers
 process.on("uncaughtException", (error) => gracefulShutdown("uncaughtException", error));
 process.on("unhandledRejection", (reason) => gracefulShutdown("unhandledRejection", reason));
 

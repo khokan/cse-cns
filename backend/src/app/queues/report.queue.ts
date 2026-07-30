@@ -1,39 +1,33 @@
-import PQueue from "p-queue";
-import { envVars } from "../config/env.js";
+import { Queue } from "bullmq";
+import { bullMqRedisConnection } from "../lib/redis.js";
+import type { ReportJobPayload } from "../modules/reports/report.interface.js";
 
-// ---------------------------------------------------------------------------
-// In-memory report job queue (p-queue).
-// Concurrency is controlled by REPORT_QUEUE_CONCURRENCY env var (default 2).
-// Swap this file with a BullMQ implementation when Redis is available.
-// ---------------------------------------------------------------------------
+export const REPORT_QUEUE_NAME = "report-queue";
 
-export const reportQueue = new PQueue({
-    concurrency: envVars.REPORT_QUEUE_CONCURRENCY ?? 2,
+export const reportQueue = new Queue<ReportJobPayload>(REPORT_QUEUE_NAME, {
+    connection: bullMqRedisConnection,
+    defaultJobOptions: {
+        attempts: 3,
+        backoff: {
+            type: "exponential",
+            delay: 2000,
+        },
+        removeOnComplete: 100,
+        removeOnFail: 500,
+    },
 });
 
-// Log queue activity in development
-if (envVars.NODE_ENV === "development") {
-    reportQueue.on("active", () => {
-        console.log(
-            `📊 [ReportQueue] Job started. Size: ${reportQueue.size} | Pending: ${reportQueue.pending}`
-        );
-    });
-
-    reportQueue.on("idle", () => {
-        console.log("📊 [ReportQueue] All jobs completed. Queue is idle.");
-    });
-
-    reportQueue.on("error", (err) => {
-        console.error("📊 [ReportQueue] Queue error:", err);
-    });
-}
-
 /**
- * Adds a function to the report queue and returns a handle.
- * The caller is responsible for updating DB status inside the job function.
+ * Enqueues a report job into BullMQ.
  */
-export const enqueueReportJob = (jobFn: () => Promise<void>): void => {
-    reportQueue.add(jobFn).catch((err) => {
-        console.error("📊 [ReportQueue] Failed to enqueue job:", err);
-    });
+export const enqueueReportJob = async (payload: ReportJobPayload): Promise<void> => {
+    try {
+        await reportQueue.add(`report:${payload.reportType}:${payload.reportJobId}`, payload, {
+            jobId: payload.reportJobId,
+        });
+        console.log(`📊 [ReportQueue] Enqueued BullMQ job: ${payload.reportJobId}`);
+    } catch (err) {
+        console.error("📊 [ReportQueue] Failed to enqueue BullMQ job:", err);
+        throw err;
+    }
 };

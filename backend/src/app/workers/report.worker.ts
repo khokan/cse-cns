@@ -1,3 +1,6 @@
+import { Worker, Job } from "bullmq";
+import { bullMqRedisConnection, reportCache } from "../lib/redis.js";
+import { REPORT_QUEUE_NAME } from "../queues/report.queue.js";
 import { db } from "../lib/prisma.js";
 import { storageLib } from "../lib/storage.js";
 import { CsvBuilder } from "../modules/reports/builders/csv.builder.js";
@@ -14,10 +17,7 @@ import type {
     CollectionRow,
     ChallanRow,
 } from "../modules/reports/builders/tax-certificate.types.js";
-
-// ---------------------------------------------------------------------------
-// DATA FETCHERS — one function per reportType
-// ---------------------------------------------------------------------------
+import { emitToUser } from "../lib/socket.js";
 
 const REPORT_TITLES: Record<string, string> = {
     member_list: "Member Listing Report",
@@ -101,25 +101,6 @@ async function fetchFinancialSummary(filters: Filters): Promise<Record<string, u
     }));
 }
 
-// ---------------------------------------------------------------------------
-// Tax Certificate — calls USP_Certificate_Show
-//
-// SP Signature:
-//   EXEC [dbo].[USP_Certificate_Show] @FromDate DATETIME, @ToDate DATETIME, @MemberID VARCHAR(20)
-//
-// Returns ONE flat result set — header info is repeated on every row.
-//   ReferenceNumber, FromDate, ToDate, MemberName, MemberID, MemberAddress,
-//   Month, [Challan Number], [Challan Date], [Trade Volume],
-//   [Total Amount in Challan], [Amount Relating to this Certificate], BankBranch
-//
-// Filters used:
-//   trecHolderId — UUID of the TrecHolder in CNSWeb (used to resolve MemberID)
-//   fiscalYear   — e.g. "2024-2025" → FromDate = 01-Jul-YYYY, ToDate = 30-Jun-YYYY+1
-//
-// If trecHolderId is absent (ADMIN shortcut) memberCode is used directly.
-// ---------------------------------------------------------------------------
-
-/** Convert fiscal year string "YYYY-YYYY+1" → { fromDate, toDate } in MSSQL-compatible format */
 function fiscalYearToDates(fiscalYear: string): { fromDate: string; toDate: string } {
     const [startYear] = fiscalYear.split("-").map(Number);
     if (!startYear || isNaN(startYear)) {
@@ -131,7 +112,6 @@ function fiscalYearToDates(fiscalYear: string): { fromDate: string; toDate: stri
     };
 }
 
-/** Format a raw decimal/number from the SP to a comma-separated string */
 function fmtDecimal(raw: string | number | null | undefined): string {
     if (raw == null || raw === "") return "0.00";
     const num = typeof raw === "string" ? parseFloat(raw) : raw;
@@ -139,7 +119,6 @@ function fmtDecimal(raw: string | number | null | undefined): string {
     return num.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }
 
-/** Format a DateTime from the SP to "dd.mm.yy" e.g. "14.08.25" */
 function fmtChallanDate(raw: Date | string | null | undefined): string {
     if (!raw) return "";
     const d = raw instanceof Date ? raw : new Date(raw);
@@ -150,7 +129,6 @@ function fmtChallanDate(raw: Date | string | null | undefined): string {
     return `${dd}.${mm}.${yy}`;
 }
 
-/** Format today's date as "DD-Mon-YYYY" e.g. "21-Jul-2026" */
 function fmtIssueDate(): string {
     const d = new Date();
     const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
@@ -161,7 +139,6 @@ function fmtIssueDate(): string {
 async function fetchTaxCertificate(filters: Filters): Promise<Record<string, unknown>[]> {
     const fiscalYear = (filters.fiscalYear as string | undefined) ?? "";
     const trecHolderId = (filters.trecHolderId as string | undefined) ?? "";
-    // ADMIN may also pass memberCode directly (e.g. "121001")
     const memberCodeDirect = (filters.memberCode as string | undefined) ?? "";
 
     if (!fiscalYear) {
@@ -171,29 +148,17 @@ async function fetchTaxCertificate(filters: Filters): Promise<Record<string, unk
         throw new Error("Either trecHolderId or memberCode filter is required for the tax certificate report.");
     }
 
-    // -----------------------------------------------------------------------
-    // 1. Resolve actual numeric MemberID (e.g. "121001") from Member table
-    // -----------------------------------------------------------------------
     const rawFilterId = (filters.trecHolderId as string | undefined) || (filters.memberCode as string | undefined) || "";
 
-    if (!rawFilterId) {
-        throw new Error("Member ID (trecHolderId or memberCode filter) is required for the tax certificate report.");
-    }
-
-    // Look up Member from CNSWeb Member table to get actual MemberID & TIN
     const member = await db.cnsWeb.member.findFirst({
         where: {
             OR: [{ MemberID: rawFilterId }, { MemberCode: rawFilterId }],
         },
     });
 
-    // Stored procedure USP_Certificate_Show strictly requires numeric MemberID (e.g. "121001")
     const memberId = member?.MemberID || rawFilterId;
     const tin = member?.TIN ?? "";
 
-    // -----------------------------------------------------------------------
-    // 2. Convert fiscal year → MSSQL date strings
-    // -----------------------------------------------------------------------
     const { fromDate, toDate } = fiscalYearToDates(fiscalYear);
 
     // -----------------------------------------------------------------------
@@ -212,20 +177,11 @@ async function fetchTaxCertificate(filters: Filters): Promise<Record<string, unk
         );
     }
 
-    // -----------------------------------------------------------------------
-    // 4. Extract header from first row (repeated on every row)
-    // -----------------------------------------------------------------------
     const firstRow = rows[0];
     const referenceNumber = firstRow.ReferenceNumber ?? `CSE/TRECHolderTax/${fiscalYear}`;
-    const memberName = (firstRow.MemberName ?? "").replace(/\.$/, "").trim(); // strip trailing dot
+    const memberName = (firstRow.MemberName ?? "").replace(/\.$/, "").trim();
     const memberAddress = (firstRow.MemberAddress ?? "").trim();
 
-    // Use TIN from CNSWeb Member; fallback to empty if not found
-    // (SP does not return TIN — it must come from the Member table)
-
-    // -----------------------------------------------------------------------
-    // 5. Build Section 04 — group rows by Month and sum volumes
-    // -----------------------------------------------------------------------
     const monthMap = new Map<string, { tradeVolume: number; incomeTax: number }>();
 
     for (const row of rows) {
@@ -244,7 +200,6 @@ async function fetchTaxCertificate(filters: Filters): Promise<Record<string, unk
         }
     }
 
-    // Preserve insertion order (SP already returns data in date order)
     const collectionRows: CollectionRow[] = Array.from(monthMap.entries()).map(
         ([monthLabel, totals], idx) => ({
             sl: idx + 1,
@@ -256,9 +211,6 @@ async function fetchTaxCertificate(filters: Filters): Promise<Record<string, unk
         })
     );
 
-    // -----------------------------------------------------------------------
-    // 6. Build Section 05 — one challan row per SP row
-    // -----------------------------------------------------------------------
     const challanRows: ChallanRow[] = rows.map((row, idx) => ({
         sl: idx + 1,
         challanNumber: (row["Challan Number"] ?? "").trim(),
@@ -268,9 +220,6 @@ async function fetchTaxCertificate(filters: Filters): Promise<Record<string, unk
         totalAmount: fmtDecimal(row["Total Amount in Challan"]),
     }));
 
-    // -----------------------------------------------------------------------
-    // 7. Assemble the final typed payload
-    // -----------------------------------------------------------------------
     const certData: TaxCertificateData = {
         referenceNumber,
         issueDate: fmtIssueDate(),
@@ -285,13 +234,8 @@ async function fetchTaxCertificate(filters: Filters): Promise<Record<string, unk
         challanRows,
     };
 
-    // Pack into the single-element array convention used by all builders
     return [certData as unknown as Record<string, unknown>];
 }
-
-// ---------------------------------------------------------------------------
-// Builder factory
-// ---------------------------------------------------------------------------
 
 const TAX_CERT = "trec_holder_tax_certificate";
 
@@ -313,10 +257,6 @@ function createBuilder(reportType: string, format: ReportFormat, title: string):
     }
 }
 
-// ---------------------------------------------------------------------------
-// Data fetcher router
-// ---------------------------------------------------------------------------
-
 async function fetchData(
     reportType: string,
     filters: Filters
@@ -329,30 +269,27 @@ async function fetchData(
 }
 
 // ---------------------------------------------------------------------------
-// Main processor — called by the queue for each job
+// Main Processor Function
 // ---------------------------------------------------------------------------
-
 export async function processReportJob(payload: ReportJobPayload): Promise<void> {
     const { reportJobId, userId, reportType, format, filters } = payload;
 
     console.log(`📊 [Worker] Processing job ${reportJobId} | ${reportType} | ${format}`);
 
-    // Mark as PROCESSING
     await db.cnsWeb.reportJob.update({
         where: { id: reportJobId },
         data: { status: "PROCESSING", startedAt: new Date() },
     });
 
-    try {
-        // 1. Fetch data
-        const data = await fetchData(reportType, filters as Filters);
+    emitToUser(userId, "report:status", { jobId: reportJobId, status: "PROCESSING" });
+    await reportCache.invalidateJob(reportJobId);
 
-        // 2. Build the report file
+    try {
+        const data = await fetchData(reportType, filters as Filters);
         const title = REPORT_TITLES[reportType] ?? "Report";
         const builder = createBuilder(reportType, format, title);
         const { buffer, extension } = await builder.generate(data, filters as Filters);
 
-        // 3. Save to local disk
         const { filePath, fileSize } = await storageLib.saveReport(
             userId,
             reportJobId,
@@ -362,7 +299,6 @@ export async function processReportJob(payload: ReportJobPayload): Promise<void>
 
         const fileName = `${reportType}_${new Date().toISOString().split("T")[0]}.${extension}`;
 
-        // 4. Update DB → COMPLETED
         await db.cnsWeb.reportJob.update({
             where: { id: reportJobId },
             data: {
@@ -374,7 +310,15 @@ export async function processReportJob(payload: ReportJobPayload): Promise<void>
             },
         });
 
-        console.log(`✅ [Worker] Job ${reportJobId} completed. File: ${filePath} (${fileSize} bytes)`);
+        await reportCache.invalidateJob(reportJobId);
+        emitToUser(userId, "report:status", {
+            jobId: reportJobId,
+            status: "COMPLETED",
+            filePath,
+            fileName,
+        });
+
+        console.log(`✅ [Worker] Job ${reportJobId} completed. File: ${filePath}`);
     } catch (err) {
         const errorMessage = err instanceof Error ? err.message : String(err);
         console.error(`❌ [Worker] Job ${reportJobId} failed:`, errorMessage);
@@ -387,5 +331,37 @@ export async function processReportJob(payload: ReportJobPayload): Promise<void>
                 completedAt: new Date(),
             },
         });
+
+        await reportCache.invalidateJob(reportJobId);
+        emitToUser(userId, "report:status", {
+            jobId: reportJobId,
+            status: "FAILED",
+            errorMessage,
+        });
     }
 }
+
+// ---------------------------------------------------------------------------
+// BullMQ Worker Class Instance
+// ---------------------------------------------------------------------------
+export let reportWorker: Worker<ReportJobPayload> | null = null;
+
+export const initReportWorker = (): Worker<ReportJobPayload> => {
+    reportWorker = new Worker<ReportJobPayload>(
+        REPORT_QUEUE_NAME,
+        async (job: Job<ReportJobPayload>) => {
+            await processReportJob(job.data);
+        },
+        { connection: bullMqRedisConnection }
+    );
+
+    reportWorker.on("completed", (job) => {
+        console.log(`✅ [ReportWorker] Job ${job.id} marked as completed in BullMQ.`);
+    });
+
+    reportWorker.on("failed", (job, err) => {
+        console.error(`❌ [ReportWorker] Job ${job?.id} failed in BullMQ:`, err.message);
+    });
+
+    return reportWorker;
+};
