@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import {
   Download,
   RefreshCw,
@@ -10,15 +11,13 @@ import {
   ChevronRight,
   Trash2,
   CheckCircle2,
-  AlertCircle,
   Clock,
 } from "lucide-react";
 import { JobProgressCard } from "./JobProgressCard";
-import { JobStatusBadge } from "./JobStatusBadge";
 import { useReportJobs, useDeleteAllReportJobs } from "@/hooks/useReportJobs";
-import type { ReportFormat, ReportStatus, ReportType } from "@/types/report.types";
+import { useJobStatus } from "@/hooks/useJobStatus";
+import type { ReportStatus } from "@/types/report.types";
 import { cn } from "@/utils/utils";
-import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 
 // Status filter tabs
@@ -53,6 +52,13 @@ export function DownloadCenter({ userRole }: DownloadCenterProps) {
 
   const { data, isLoading, isFetching, error } = useReportJobs(params);
 
+  useJobStatus(undefined, (event) => {
+    toast.info(`Report ${event.status}`, {
+      description: event.fileName ?? event.jobId,
+    });
+    queryClient.invalidateQueries({ queryKey: ["report-jobs"] });
+  });
+
   const jobs = data?.data ?? [];
   const meta = data?.meta;
   const totalPages = meta?.totalPages ?? 1;
@@ -61,7 +67,6 @@ export function DownloadCenter({ userRole }: DownloadCenterProps) {
   const completedJobs = jobs.filter((j) => j.status === "COMPLETED");
   const processingJobs = jobs.filter((j) => j.status === "PROCESSING");
   const pendingJobs = jobs.filter((j) => j.status === "PENDING");
-  const failedJobs = jobs.filter((j) => j.status === "FAILED");
 
   const batchTotal = jobs.length;
   const hasActiveJobs = processingJobs.length > 0 || pendingJobs.length > 0;
@@ -142,7 +147,7 @@ export function DownloadCenter({ userRole }: DownloadCenterProps) {
 
       {/* Progress Notification Banner (Batch / Active Job Progress) */}
       {(hasActiveJobs || completedJobs.length > 0) && (
-        <div className="rounded-2xl border border-primary/20 bg-gradient-to-br from-primary/10 via-card to-card p-5 shadow-sm space-y-4">
+        <div className="rounded-2xl border border-primary/20 bg-linear-to-br from-primary/10 via-card to-card p-5 shadow-sm space-y-4">
           <div className="flex items-center justify-between gap-3">
             <div className="flex items-center gap-3">
               <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-primary/20 text-primary">
@@ -191,7 +196,7 @@ export function DownloadCenter({ userRole }: DownloadCenterProps) {
           {/* Progress Bar */}
           <div className="h-2 w-full rounded-full bg-muted overflow-hidden">
             <div
-              className="h-full bg-gradient-to-r from-primary via-blue-500 to-emerald-500 transition-all duration-500"
+              className="h-full bg-linear-to-r from-primary via-blue-500 to-emerald-500 transition-all duration-500"
               style={{ width: `${percentCompleted}%` }}
             />
           </div>

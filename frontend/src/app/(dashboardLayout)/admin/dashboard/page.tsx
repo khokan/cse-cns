@@ -1,9 +1,15 @@
 import { userService } from "@/services/user.service";
 import { redirect } from "next/navigation";
-import { ReconciliationDashboard } from "@/components/modules/dashboard/ReconciliationDashboard";
+import { AdminStatsCards } from "@/components/modules/admin/AdminStatsCards";
+import { AuditLogViewer } from "@/components/modules/admin/AuditLogViewer";
+import type { Metadata } from "next";
+
+export const metadata: Metadata = {
+  title: "Admin Dashboard | CSE-CNS",
+  description: "System overview, stats and audit logs.",
+};
 
 export const dynamic = "force-dynamic";
-
 
 export default async function AdminDashboard() {
   const session = await userService.getSession();
@@ -25,10 +31,16 @@ export default async function AdminDashboard() {
           Welcome, {user.name} 👋
         </h1>
         <p className="text-sm text-muted-foreground">
-          Reconciliation overview across Spot, A B G N, and Z settlement groups.
+          Admin overview: users, report jobs, settlements and audit logs.
         </p>
       </div>
-      <ReconciliationDashboard />
+
+      <AdminStatsCards />
+
+      <div className="space-y-4">
+        <h2 className="text-xl font-semibold">Audit Logs</h2>
+        <AuditLogViewer />
+      </div>
     </div>
   );
 }

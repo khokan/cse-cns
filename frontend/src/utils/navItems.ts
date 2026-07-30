@@ -65,6 +65,21 @@ export const AdminNavItems: NavSection[] = [
             },
         ],
     },
+    {
+        title: "Operations",
+        items: [
+            {
+                title: "Data Tables",
+                href: "/data",
+                icon: "Database",
+            },
+            {
+                title: "Settlements",
+                href: "/settlements",
+                icon: "ArrowLeftRight",
+            },
+        ],
+    },
 ];
 
 export const TrecHolderNavItems: NavSection[] = [
