@@ -12,6 +12,7 @@ import { globalErrorHandler } from "./app/middleware/globalErrorHandler.js";
 import { notFound } from "./app/middleware/notFound.js";
 import { correlationIdMiddleware } from "./app/middleware/correlationId.js";
 import { requestLogger } from "./app/utils/logger.js";
+import Sentry, { captureException } from "./app/lib/sentry.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -46,6 +47,11 @@ app.use(express.urlencoded({ extended: true }));
 app.use(express.json());
 app.use(cookieParser());
 
+// Sentry error handler (must be before other error handlers)
+if (process.env.SENTRY_DSN) {
+  Sentry.setupExpressErrorHandler(app);
+}
+
 // Better Auth handler
 app.use("/api/auth", toNodeHandler(auth));
 
@@ -65,6 +71,12 @@ app.get("/", async (req: Request, res: Response) => {
     success: true,
     message: "CSE-CNS Backend is working",
   });
+});
+
+app.get("/debug/sentry", (_req, res) => {
+  const error = new Error("Sentry debug route");
+  captureException(error);
+  res.json({ success: true, message: "Sentry event sent (if DSN configured)" });
 });
 
 // Global error handler & 404 handler

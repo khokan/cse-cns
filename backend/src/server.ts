@@ -8,11 +8,13 @@ import { initReportWorker, reportWorker } from "./app/workers/report.worker.js";
 import { initSettlementWorker, settlementWorker } from "./app/workers/settlement.worker.js";
 import { redisClient } from "./app/lib/redis.js";
 import logger from "./app/utils/logger.js";
+import { initSentry } from "./app/lib/sentry.js";
 
 let server: Server;
 
 const bootstrap = async () => {
     try {
+        initSentry();
         await db.cnsWeb.$connect();
         await db.cns.$connect();
         logger.info("Databases connected", { db: 'cnsweb,cns' });
