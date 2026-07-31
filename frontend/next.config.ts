@@ -1,4 +1,5 @@
 import type { NextConfig } from "next";
+import { withSentryConfig } from "@sentry/nextjs";
 
 const nextConfig: NextConfig = {
   /* config options here */
@@ -32,4 +33,15 @@ const nextConfig: NextConfig = {
   },
 };
 
-export default nextConfig;
+// Only apply Sentry wrapper in production builds
+// In development, Sentry is NOT initialized at build time
+const config = process.env.NODE_ENV === "production"
+  ? withSentryConfig(nextConfig, {
+      org: process.env.SENTRY_ORG || "learner-va",
+      project: process.env.SENTRY_PROJECT || "cse-cns",
+      authToken: process.env.SENTRY_AUTH_TOKEN,
+      silent: false,
+    })
+  : nextConfig;
+
+export default config;

@@ -25,7 +25,9 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       <body>
         <ThemeProvider>
           <QueryProviders>
+            <Navbar />
             <main className="min-h-[calc(100vh-170px)]">{children}</main>
+            <Footer />
             <Toaster richColors position="top-right" />
           </QueryProviders>
         </ThemeProvider>
