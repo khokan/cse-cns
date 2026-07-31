@@ -1,10 +1,28 @@
 import { db } from "../../lib/prisma.js";
-import { getTableConfig } from "./datatable.registry.js";
+import { getTableConfig, TABLE_REGISTRY } from "./datatable.registry.js";
 import { DatatableQuery } from "./datatable.interface.js";
 import { UserRoleType } from "../../types/auth.types.js";
 import { writeAuditLog } from "../../utils/auditLog.js";
 import AppError from "../../errorHelpers/AppError.js";
 import status from "http-status";
+
+const parseId = (id: string, idType?: "bigint" | "int" | "string") => {
+    if (idType === "bigint") {
+        try {
+            return BigInt(id);
+        } catch {
+            throw new AppError(status.BAD_REQUEST, `Invalid bigint ID '${id}'.`);
+        }
+    }
+    if (idType === "int") {
+        const parsed = Number(id);
+        if (!Number.isInteger(parsed)) {
+            throw new AppError(status.BAD_REQUEST, `Invalid integer ID '${id}'.`);
+        }
+        return parsed;
+    }
+    return id;
+};
 
 const getDelegate = (dbName: "cnsWeb" | "cns", modelName: string) => {
     const dbClient = db[dbName] as any;
@@ -19,7 +37,6 @@ const getDelegate = (dbName: "cnsWeb" | "cns", modelName: string) => {
 };
 
 const getAccessibleTables = (userRole: UserRoleType) => {
-    const { TABLE_REGISTRY } = require("./datatable.registry.js");
     return Object.entries(TABLE_REGISTRY)
         .filter(([_, config]: [string, any]) => config.readRoles.includes(userRole))
         .map(([key, config]: [string, any]) => ({
@@ -106,7 +123,7 @@ const getRow = async (tableKey: string, id: string, userRole: UserRoleType) => {
     }
 
     const delegate = getDelegate(config.db, config.model);
-    const parsedId = isNaN(Number(id)) ? id : Number(id);
+    const parsedId = parseId(id, config.idType);
 
     const row = await delegate.findUnique({
         where: { [config.primaryKey]: parsedId },
@@ -169,11 +186,14 @@ const updateRow = async (
     }
 
     const delegate = getDelegate(config.db, config.model);
-    const parsedId = isNaN(Number(id)) ? id : Number(id);
+    const parsedId = parseId(id, config.idType);
+
+    // Prevent trying to update the primary key
+    const { [config.primaryKey]: _pk, ...updateData } = data;
 
     const updated = await delegate.update({
         where: { [config.primaryKey]: parsedId },
-        data,
+        data: updateData,
     });
 
     const serialized = JSON.parse(
@@ -207,7 +227,7 @@ const deleteRow = async (
     }
 
     const delegate = getDelegate(config.db, config.model);
-    const parsedId = isNaN(Number(id)) ? id : Number(id);
+    const parsedId = parseId(id, config.idType);
 
     const deleted = await delegate.delete({
         where: { [config.primaryKey]: parsedId },

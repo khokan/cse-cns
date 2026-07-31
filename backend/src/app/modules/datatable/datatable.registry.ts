@@ -6,6 +6,7 @@ export const TABLE_REGISTRY: Record<string, TableConfig> = {
         db: "cns",
         model: "challan",
         primaryKey: "ID",
+        idType: "int",
         readRoles: [UserRole.ADMIN, UserRole.IT, UserRole.ACCOUNTING],
         writeRoles: [UserRole.ADMIN, UserRole.IT, UserRole.ACCOUNTING],
         searchableFields: ["ChallanNumber"],
@@ -13,15 +14,17 @@ export const TABLE_REGISTRY: Record<string, TableConfig> = {
     taxToNBR: {
         db: "cns",
         model: "taxToNBR",
-        primaryKey: "ID",
+        primaryKey: "id",
+        idType: "bigint",
         readRoles: [UserRole.ADMIN, UserRole.IT, UserRole.ACCOUNTING],
         writeRoles: [UserRole.ADMIN, UserRole.IT, UserRole.ACCOUNTING],
-        searchableFields: ["ContractNumber", "DeducteeTIN", "TRECHolderName", "MemberID"],
+        searchableFields: ["contractNumber", "deducteeTIN", "trecHolderName", "memberId"],
     },
     settlement: {
         db: "cns",
         model: "settlement",
         primaryKey: "ContractNumber",
+        idType: "string",
         readRoles: [UserRole.ADMIN, UserRole.IT, UserRole.ACCOUNTING],
         writeRoles: [UserRole.ADMIN, UserRole.IT],
         searchableFields: ["ContractNumber", "ScripID", "BuyBrokerCode", "SellBrokerCode"],
@@ -30,6 +33,7 @@ export const TABLE_REGISTRY: Record<string, TableConfig> = {
         db: "cnsWeb",
         model: "member",
         primaryKey: "MemberID",
+        idType: "string",
         readRoles: [UserRole.ADMIN, UserRole.IT, UserRole.ACCOUNTING],
         writeRoles: [UserRole.ADMIN],
         searchableFields: ["MemberCode", "MemberName", "TIN", "EmailAddress"],
@@ -38,6 +42,7 @@ export const TABLE_REGISTRY: Record<string, TableConfig> = {
         db: "cnsWeb",
         model: "auditLog",
         primaryKey: "id",
+        idType: "string",
         readRoles: [UserRole.ADMIN, UserRole.IT],
         writeRoles: [], // Audit logs are read-only
         searchableFields: ["action", "entity", "userEmail", "userId"],
@@ -45,5 +50,5 @@ export const TABLE_REGISTRY: Record<string, TableConfig> = {
 };
 
 export const getTableConfig = (tableKey: string): TableConfig | null => {
-    return TABLE_REGISTRY[tableKey.toLowerCase()] ?? null;
+    return TABLE_REGISTRY[tableKey] ?? null;
 };

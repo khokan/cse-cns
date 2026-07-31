@@ -4,6 +4,7 @@ export interface TableConfig {
   db: "cnsWeb" | "cns";
   model: string;
   primaryKey: string;
+  idType?: "bigint" | "int" | "string";
   readRoles: UserRoleType[];
   writeRoles: UserRoleType[];
   searchableFields?: string[];

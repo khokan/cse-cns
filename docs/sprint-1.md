@@ -164,10 +164,7 @@ Three tokens are issued and stored as `httpOnly` cookies on login/register:
 
 ```typescript
 enum UserRole {
-  SUPER_ADMIN = 'SUPER_ADMIN',
   ADMIN       = 'ADMIN',
-  DOCTOR      = 'DOCTOR',
-  PATIENT     = 'PATIENT',
   TRECHOLDER  = 'TRECHOLDER'   // default for new signups
 }
 ```

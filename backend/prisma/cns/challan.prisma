@@ -1,5 +1,5 @@
 model Challan {
-  ID                     BigInt    @id(map: "PK_Challan") @default(autoincrement())
+  ID                     Int    @id(map: "PK_Challan") @default(autoincrement())
   ChallanNumber          String?   @db.VarChar(100)
   ChallanDate            DateTime? @db.DateTime
   ChallanPeriodStartDate DateTime? @db.DateTime

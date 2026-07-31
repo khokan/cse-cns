@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import { AdminStatsCards } from "@/components/modules/admin/AdminStatsCards";
 import { AuditLogViewer } from "@/components/modules/admin/AuditLogViewer";
 import type { Metadata } from "next";
+import AdminDashboard from "@/components/modules/admin-dashboard/AdminDashboard";
 
 export const metadata: Metadata = {
   title: "Admin Dashboard | CSE-CNS",
@@ -11,7 +12,7 @@ export const metadata: Metadata = {
 
 export const dynamic = "force-dynamic";
 
-export default async function AdminDashboard() {
+export default async function AdminDashboardPage() {
   const session = await userService.getSession();
 
   if (!session?.data) {
@@ -26,15 +27,7 @@ export default async function AdminDashboard() {
 
   return (
     <div className="space-y-8">
-      <div className="rounded-2xl bg-linear-to-br from-primary/10 via-primary/5 to-transparent border border-primary/20 p-6">
-        <h1 className="text-2xl font-bold text-foreground mb-1">
-          Welcome, {user.name} 👋
-        </h1>
-        <p className="text-sm text-muted-foreground">
-          Admin overview: users, report jobs, settlements and audit logs.
-        </p>
-      </div>
-
+        <AdminDashboard />
       <AdminStatsCards />
 
       <div className="space-y-4">
