@@ -1,71 +1,61 @@
-import { envVars } from "../config/env";
+import winston from 'winston';
+import { envVars } from '../config/env.js';
+import { Request, Response, NextFunction } from 'express';
 
-export type LogLevel = "info" | "warn" | "error" | "debug";
+const isDevelopment = envVars.NODE_ENV === 'development';
 
-export interface LogPayload {
-  message: string;
-  level?: LogLevel;
-  meta?: Record<string, unknown>;
-  error?: unknown;
-}
+// Request logging middleware
+  const requestLogger = (req: Request, res: Response, next: NextFunction) => {
+  const start = Date.now();
+  
+  res.on('finish', () => {
+    const duration = Date.now() - start;
+    logger.info('HTTP Request', {
+      method: req.method,
+      path: req.path,
+      statusCode: res.statusCode,
+      duration: `${duration}ms`,
+      correlationId: (req as any).correlationId
+    });
+  });
+  
+  next();
+};
 
-class Logger {
-  private formatLog(level: LogLevel, message: string, meta?: Record<string, unknown>, error?: unknown) {
-    const timestamp = new Date().toISOString();
-    
-    if (envVars.NODE_ENV === "production") {
-      // Structured JSON logging for aggregators (Datadog, CloudWatch, ELK)
-      return JSON.stringify({
-        timestamp,
-        level,
-        message,
-        ...(meta ? { meta } : {}),
-        ...(error instanceof Error ? { error: { message: error.message, stack: error.stack } } : error ? { error } : {}),
-      });
-    }
+// Winston logger configuration
+const logger = winston.createLogger({
+  level: isDevelopment ? 'debug' : 'info',
+  format: winston.format.combine(
+    winston.format.timestamp({ format: 'YYYY-MM-DD HH:mm:ss' }),
+    winston.format.errors({ stack: true }),
+    winston.format.json()
+  ),
+  transports: [
+    // Console for all environments
+    new winston.transports.Console({
+      format: isDevelopment
+        ? winston.format.combine(
+            winston.format.colorize(),
+            winston.format.printf(({ level, message, timestamp, ...meta }) => {
+              const metaStr = Object.keys(meta).length
+                ? JSON.stringify(meta, null, 2)
+                : '';
+              return `${timestamp} [${level}] ${message} ${metaStr}`;
+            })
+          )
+        : winston.format.json()
+    }),
+    // File for errors
+    new winston.transports.File({
+      filename: 'logs/error.log',
+      level: 'error'
+    }),
+    // File for all logs
+    new winston.transports.File({
+      filename: 'logs/combined.log'
+    })
+  ]
+});
 
-    // Human-readable dev output
-    const prefix = `[${timestamp}] [${level.toUpperCase()}]`;
-    return { prefix, message, meta, error };
-  }
-
-  info(message: string, meta?: Record<string, unknown>) {
-    const formatted = this.formatLog("info", message, meta);
-    if (typeof formatted === "string") {
-      console.log(formatted);
-    } else {
-      console.log(`${formatted.prefix} ${formatted.message}`, meta || "");
-    }
-  }
-
-  warn(message: string, meta?: Record<string, unknown>) {
-    const formatted = this.formatLog("warn", message, meta);
-    if (typeof formatted === "string") {
-      console.warn(formatted);
-    } else {
-      console.warn(`${formatted.prefix} ${formatted.message}`, meta || "");
-    }
-  }
-
-  error(message: string, error?: unknown, meta?: Record<string, unknown>) {
-    const formatted = this.formatLog("error", message, meta, error);
-    if (typeof formatted === "string") {
-      console.error(formatted);
-    } else {
-      console.error(`${formatted.prefix} ${formatted.message}`, error || "", meta || "");
-    }
-  }
-
-  debug(message: string, meta?: Record<string, unknown>) {
-    if (envVars.NODE_ENV === "development") {
-      const formatted = this.formatLog("debug", message, meta);
-      if (typeof formatted === "string") {
-        console.debug(formatted);
-      } else {
-        console.debug(`${formatted.prefix} ${formatted.message}`, meta || "");
-      }
-    }
-  }
-}
-
-export const logger = new Logger();
+export default logger;
+export { requestLogger };

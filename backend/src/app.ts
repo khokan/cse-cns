@@ -10,6 +10,8 @@ import cookieParser from "cookie-parser";
 import { IndexRoutes } from "./app/routes/index.js";
 import { globalErrorHandler } from "./app/middleware/globalErrorHandler.js";
 import { notFound } from "./app/middleware/notFound.js";
+import { correlationIdMiddleware } from "./app/middleware/correlationId.js";
+import { requestLogger } from "./app/utils/logger.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -24,6 +26,11 @@ const app: Application = express();
 //   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
 //   allowedHeaders: ['Content-Type', 'Authorization'],
 // }));
+
+// Correlation ID middleware
+app.use(correlationIdMiddleware);
+// Request logging middleware
+app.use(requestLogger);
 
 app.use(
   cors({

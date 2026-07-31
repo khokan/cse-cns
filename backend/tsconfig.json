@@ -12,5 +12,6 @@
     "forceConsistentCasingInFileNames": true,
     "ignoreDeprecations": "5.0"
   }, 
+  "include": ["src/**/*"],
   "exclude": ["prisma.config.ts", "prisma.cns.config.ts", "prisma.cnsweb.config.ts","node_modules","dist"]
 }

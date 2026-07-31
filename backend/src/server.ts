@@ -7,6 +7,7 @@ import { initSocketServer } from "./app/lib/socket.js";
 import { initReportWorker, reportWorker } from "./app/workers/report.worker.js";
 import { initSettlementWorker, settlementWorker } from "./app/workers/settlement.worker.js";
 import { redisClient } from "./app/lib/redis.js";
+import logger from "./app/utils/logger.js";
 
 let server: Server;
 
@@ -14,12 +15,12 @@ const bootstrap = async () => {
     try {
         await db.cnsWeb.$connect();
         await db.cns.$connect();
-        console.log("✅ Both databases connected successfully (CNSWeb + CNS)");
+        logger.info("Databases connected", { db: 'cnsweb,cns' });
 
         await seedSuperAdmin();
 
         server = app.listen(envVars.PORT, () => {
-            console.log(`🚀 Server running on http://localhost:${envVars.PORT}`);
+            logger.info(`Server running on http://localhost:${envVars.PORT}`);
         });
 
         // Initialize Socket.IO server
@@ -28,17 +29,17 @@ const bootstrap = async () => {
         // Initialize BullMQ Workers
         initReportWorker();
         initSettlementWorker();
-        console.log("⚙️  [Workers] ReportWorker and SettlementWorker started successfully.");
+        logger.info("⚙️  [Workers] ReportWorker and SettlementWorker started successfully.");
     } catch (error) {
-        console.error("❌ Failed to start server:", error);
+        logger.error("❌ Failed to start server:", error);
         process.exit(1);
     }
 };
 
 const gracefulShutdown = async (signal: string, error?: unknown) => {
-    console.log(`⚠️ ${signal} received. Initiating graceful shutdown...`);
+    logger.warn(`⚠️ ${signal} received. Initiating graceful shutdown...`);
     if (error) {
-        console.error("Error details:", error);
+        logger.error("Error details:", error);
     }
 
     if (reportWorker) await reportWorker.close();
@@ -47,22 +48,22 @@ const gracefulShutdown = async (signal: string, error?: unknown) => {
 
     if (server) {
         server.close(async () => {
-            console.log("HTTP server closed.");
+            logger.info("HTTP server closed.");
             try {
                 await db.disconnect();
-                console.log("✅ All database connections closed successfully.");
+                logger.info("✅ All database connections closed successfully.");
                 process.exit(0);
             } catch (disconnectError) {
-                console.error("Error disconnecting database clients:", disconnectError);
+                logger.error("Error disconnecting database clients:", disconnectError);
                 process.exit(1);
             }
         });
     } else {
         try {
             await db.disconnect();
-            console.log("✅ All database connections closed successfully.");
+            logger.info("✅ All database connections closed successfully.");
         } catch (disconnectError) {
-            console.error("Error disconnecting database clients:", disconnectError);
+            logger.error("Error disconnecting database clients:", disconnectError);
         }
         process.exit(1);
     }

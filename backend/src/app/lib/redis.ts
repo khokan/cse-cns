@@ -1,5 +1,6 @@
 import { Redis } from "ioredis";
 import { envVars } from "../config/env.js";
+import logger from "../utils/logger.js";
 
 type RedisError = Error & { code?: string };
 
@@ -11,16 +12,16 @@ const redisOptions = {
     reconnectOnError: (err: RedisError) => {
         const code = getErrorCode(err);
         const fatal = ["ECONNREFUSED", "EAI_AGAIN", "ENOTFOUND"].includes(code);
-        console.warn(`⚠️ [Redis] reconnectOnError: ${code} — ${fatal ? "abort" : "retry"}`);
+        logger.warn(`⚠️ [Redis] reconnectOnError: ${code} — ${fatal ? "abort" : "retry"}`);
         return !fatal;
     },
     retryStrategy: (times: number) => {
         if (times > 5) {
-            console.error("❌ [Redis] Max reconnection attempts reached.");
+            logger.error("❌ [Redis] Max reconnection attempts reached.");
             return null;
         }
         const delay = Math.min(times * 500, 3000);
-        console.log(`🔁 [Redis] Reconnecting in ${delay}ms... (attempt ${times})`);
+        logger.info(`🔁 [Redis] Reconnecting in ${delay}ms... (attempt ${times})`);
         return delay;
     },
 };
@@ -38,23 +39,23 @@ export const bullMqRedisConnection = new Redis(envVars.REDIS_URL, {
 });
 
 redisClient.on("error", (err) => {
-    console.error("❌ [Redis] Connection error:", getErrorCode(err), err.message);
+    logger.error("❌ [Redis] Connection error:", getErrorCode(err), err.message);
 });
 
 redisClient.on("connect", () => {
-    console.log("✅ [Redis] Connected to", envVars.REDIS_URL.replace(/:\/\/.*@/, "://***@"));
+    logger.info("✅ [Redis] Connected to", envVars.REDIS_URL.replace(/:\/\/.*@/, "://***@"));
 });
 
 redisClient.on("reconnecting", () => {
-    console.log("🔁 [Redis] Reconnecting...");
+    logger.info("🔁 [Redis] Reconnecting...");
 });
 
 bullMqRedisConnection.on("error", (err) => {
-    console.error("❌ [BullMQ Redis] Connection error:", getErrorCode(err), err.message);
+    logger.error("❌ [BullMQ Redis] Connection error:", getErrorCode(err), err.message);
 });
 
 bullMqRedisConnection.on("connect", () => {
-    console.log("✅ [BullMQ Redis] Connected");
+    logger.info("✅ [BullMQ Redis] Connected");
 });
 
 // Generic JSON cache helpers
@@ -63,7 +64,7 @@ export async function cacheGet<T>(key: string): Promise<T | null> {
         const data = await redisClient.get(key);
         return data ? JSON.parse(data) : null;
     } catch (err) {
-        console.error(`[Redis] Failed to get key ${key}:`, err);
+        logger.error(`[Redis] Failed to get key ${key}:`, err);
         return null;
     }
 }
@@ -72,7 +73,7 @@ export async function cacheSet<T>(key: string, value: T, ttlSeconds: number): Pr
     try {
         await redisClient.set(key, JSON.stringify(value), "EX", ttlSeconds);
     } catch (err) {
-        console.error(`[Redis] Failed to set key ${key}:`, err);
+        logger.error(`[Redis] Failed to set key ${key}:`, err);
     }
 }
 
@@ -80,7 +81,7 @@ export async function cacheDel(key: string): Promise<void> {
     try {
         await redisClient.del(key);
     } catch (err) {
-        console.error(`[Redis] Failed to delete key ${key}:`, err);
+        logger.error(`[Redis] Failed to delete key ${key}:`, err);
     }
 }
 

@@ -2,6 +2,7 @@ import { UserRole } from "../types/auth.types";
 import { envVars } from "../config/env";
 import { auth } from "../lib/auth";
 import { prisma } from "../lib/prisma";
+import logger from "./logger";
 
 export const seedSuperAdmin = async () => {
     try {
@@ -12,7 +13,7 @@ export const seedSuperAdmin = async () => {
         })
 
         if(isAdminExist) {
-            console.log("Admin already exists. Skipping seeding admin.");
+            logger.info("Admin already exists. Skipping seeding admin.");
             return;
         }
 
@@ -38,9 +39,9 @@ export const seedSuperAdmin = async () => {
             });
         });
 
-        console.log("Admin Created ", adminUser);
+        logger.info("Admin Created ", adminUser);
     } catch (error) {
-        console.error("Error seeding admin: ", error);
+        logger.error("Error seeding admin: ", error);
         await prisma.user.delete({
             where : {
                 email : envVars.ADMIN_EMAIL,

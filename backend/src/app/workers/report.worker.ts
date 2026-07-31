@@ -18,6 +18,7 @@ import type {
     ChallanRow,
 } from "../modules/reports/builders/tax-certificate.types.js";
 import { emitToUser } from "../lib/socket.js";
+import logger from "../utils/logger.js";
 
 const REPORT_TITLES: Record<string, string> = {
     member_list: "Member Listing Report",
@@ -165,7 +166,7 @@ async function fetchTaxCertificate(filters: Filters): Promise<Record<string, unk
     // 3. Execute stored procedure
     //    EXEC [dbo].[USP_Certificate_Show] @FromDate = '...', @ToDate = '...', @MemberID = '...'
     // -----------------------------------------------------------------------
-    console.log(`📋 [TaxCert] Calling Certificate_Show | MemberID=${memberId} | ${fromDate} → ${toDate}`);
+    logger.info(`📋 [TaxCert] Calling Certificate_Show | MemberID=${memberId} | ${fromDate} → ${toDate}`);
 
     const rows = await db.cns.$queryRawUnsafe<SpRawRow[]>(
         `EXEC [dbo].[USP_Certificate_Show] @FromDate = '${fromDate}', @ToDate = '${toDate}', @MemberID = '${memberId}'`
@@ -274,7 +275,7 @@ async function fetchData(
 export async function processReportJob(payload: ReportJobPayload): Promise<void> {
     const { reportJobId, userId, reportType, format, filters } = payload;
 
-    console.log(`📊 [Worker] Processing job ${reportJobId} | ${reportType} | ${format}`);
+    logger.info(`📊 [Worker] Processing job ${reportJobId} | ${reportType} | ${format}`);
 
     await db.cnsWeb.reportJob.update({
         where: { id: reportJobId },
@@ -318,10 +319,10 @@ export async function processReportJob(payload: ReportJobPayload): Promise<void>
             fileName,
         });
 
-        console.log(`✅ [Worker] Job ${reportJobId} completed. File: ${filePath}`);
+        logger.info(`✅ [Worker] Job ${reportJobId} completed. File: ${filePath}`);
     } catch (err) {
         const errorMessage = err instanceof Error ? err.message : String(err);
-        console.error(`❌ [Worker] Job ${reportJobId} failed:`, errorMessage);
+        logger.error(`❌ [Worker] Job ${reportJobId} failed:`, errorMessage);
 
         await db.cnsWeb.reportJob.update({
             where: { id: reportJobId },
@@ -356,11 +357,11 @@ export const initReportWorker = (): Worker<ReportJobPayload> => {
     );
 
     reportWorker.on("completed", (job) => {
-        console.log(`✅ [ReportWorker] Job ${job.id} marked as completed in BullMQ.`);
+        logger.info(`✅ [ReportWorker] Job ${job.id} marked as completed in BullMQ.`);
     });
 
     reportWorker.on("failed", (job, err) => {
-        console.error(`❌ [ReportWorker] Job ${job?.id} failed in BullMQ:`, err.message);
+        logger.error(`❌ [ReportWorker] Job ${job?.id} failed in BullMQ:`, err.message);
     });
 
     return reportWorker;

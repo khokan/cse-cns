@@ -1,7 +1,7 @@
 import status from "http-status";
 import { db } from "../../lib/prisma.js";
 import AppError from "../../errorHelpers/AppError.js";
-import { logger } from "../../utils/logger.js";
+import logger from "../../utils/logger.js";
 import type {
     ReceivableSummaryRawRow,
     ReceivableSummary,

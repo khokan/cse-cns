@@ -8,4 +8,5 @@ src/generated
 
 # Generated report files (keep directory, ignore contents)
 uploads/reports/**/*
-!uploads/reports/.gitkeep
+!uploads/reports/.gitkeep
+logs
