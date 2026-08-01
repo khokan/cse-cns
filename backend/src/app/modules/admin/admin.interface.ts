@@ -20,6 +20,7 @@ export interface AuditLogQuery {
   action?: string;
   entity?: string;
   userId?: string;
+  search?: string;
   dateFrom?: string;
   dateTo?: string;
 }

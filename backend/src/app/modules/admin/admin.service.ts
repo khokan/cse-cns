@@ -152,6 +152,16 @@ const getAuditLogs = async (query: AuditLogQuery) => {
         ...(query.action ? { action: query.action } : {}),
         ...(query.entity ? { entity: query.entity } : {}),
         ...(query.userId ? { userId: query.userId } : {}),
+        ...(query.search
+            ? {
+                  OR: [
+                      { action: { contains: query.search } },
+                      { entity: { contains: query.search } },
+                      { userEmail: { contains: query.search } },
+                      { entityId: { contains: query.search } },
+                  ],
+              }
+            : {}),
         ...(query.dateFrom || query.dateTo
             ? {
                   createdAt: {
