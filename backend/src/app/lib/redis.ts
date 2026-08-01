@@ -27,9 +27,14 @@ const redisOptions = {
 };
 
 // Cache/general-purpose Redis client with retries
+// commandTimeout ensures a GET/SET never hangs indefinitely (e.g. while Redis
+// is disconnected/reconnecting) — commands reject after N ms instead of
+// sitting in ioredis' offline queue forever, which previously caused API
+// requests like /reports/members to hang for minutes/hours.
 export const redisClient = new Redis(envVars.REDIS_URL, {
     ...redisOptions,
     maxRetriesPerRequest: 3,
+    commandTimeout: 3000,
 });
 
 // Dedicated BullMQ connection: blocking commands require maxRetriesPerRequest = null

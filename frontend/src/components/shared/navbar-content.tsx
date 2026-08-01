@@ -49,7 +49,7 @@ export default function NavbarContent({ user, menu }: NavbarClientProps) {
         <Link href="/" className="shrink-0 group">
           <div className="relative h-10 w-36 transition-transform group-hover:scale-105 md:h-12 md:w-40">
             <Image
-              src="/logo.svg"
+              src="/cse-logo.png"
               alt="CSE Logo"
               fill
               className="object-contain"

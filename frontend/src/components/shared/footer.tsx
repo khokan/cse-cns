@@ -4,7 +4,6 @@ import { Facebook, Github, Linkedin, Mail } from "lucide-react";
 const productLinks = [
 	{ href: "/", label: "Home" },
 	{ href: "/dashboard", label: "Dashboard" },
-	{ href: "/courses", label: "Courses" },
 ];
 
 const companyLinks = [
@@ -15,8 +14,8 @@ const companyLinks = [
 
 const socialLinks = [
 	{ href: "https://www.linkedin.com/company/CSE-platform", label: "LinkedIn", icon: Linkedin },
-	{ href: "https://github.com/khokan/ilearning-fe", label: "GitHub", icon: Github },
-	{ href: "https://facebook.com/ilearningplatform", label: "Facebook", icon: Facebook },
+	{ href: "https://github.com/khokan/cse-cns", label: "GitHub", icon: Github },
+	{ href: "https://facebook.com/cse", label: "Facebook", icon: Facebook },
 ];
 
 export function Footer() {
@@ -27,15 +26,14 @@ export function Footer() {
 					<div className="space-y-4 lg:col-span-2">
 						<h3 className="text-xl font-semibold tracking-tight text-foreground">CSE</h3>
 						<p className="max-w-md text-sm leading-6 text-muted-foreground">
-							Build career-ready skills with guided learning paths, premium resources,
-							and a focused dashboard experience designed for fast progress.
+							Established in 1995, it plays a vital role in Bangladesh's capital market by facilitating efficient price discovery, supporting capital formation, and promoting investor confidence through fair and regulated trading.
 						</p>
 						<a
-							href="mailto:support@ilearning.com"
+							href="mailto:support@cse.com.bd"
 							className="inline-flex items-center gap-2 rounded-full border border-border/70 px-3 py-1.5 text-sm font-medium text-muted-foreground transition-colors hover:border-primary/40 hover:text-primary"
 						>
 							<Mail className="h-4 w-4" />
-							support@ilearning.com
+							support@cse.com.bd
 						</a>
 					</div>
 
@@ -74,7 +72,7 @@ export function Footer() {
 
 				<div className="mt-10 flex flex-col gap-4 border-t border-border/70 pt-6 sm:flex-row sm:items-center sm:justify-between">
 					<p className="text-sm text-muted-foreground">
-						Copyright {new Date().getFullYear()} iLearning. All rights reserved.
+						Copyright {new Date().getFullYear()} Chittagong Stock Exchange PLC.
 					</p>
 
 					<div className="flex items-center gap-2">

@@ -3,7 +3,7 @@ import { redirect } from "next/navigation";
 import { AdminStatsCards } from "@/components/modules/admin/AdminStatsCards";
 import { AuditLogViewer } from "@/components/modules/admin/AuditLogViewer";
 import type { Metadata } from "next";
-import AdminDashboard from "@/components/modules/admin-dashboard/AdminDashboard";
+import { ReconciliationDashboard } from "@/components/modules/admin/ReconciliationDashboard";
 
 export const metadata: Metadata = {
   title: "Admin Dashboard | CSE-CNS",
@@ -27,13 +27,9 @@ export default async function AdminDashboardPage() {
 
   return (
     <div className="space-y-8">
-        <AdminDashboard />
+      <ReconciliationDashboard />
       <AdminStatsCards />
-
-      <div className="space-y-4">
-        <h2 className="text-xl font-semibold">Audit Logs</h2>
-        <AuditLogViewer />
-      </div>
+      <AuditLogViewer />
     </div>
   );
 }

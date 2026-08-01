@@ -1,5 +1,5 @@
-import DashboardNavbar from "@/components/modules/Dashboord/DashboardNavbar"
-import DashboardSidebar from "@/components/modules/Dashboord/DashboardSidebar"
+import DashboardNavbar from "@/components/modules/dashboord/DashboardNavbar"
+import DashboardSidebar from "@/components/modules/dashboord/DashboardSidebar"
 
 import React from "react"
 

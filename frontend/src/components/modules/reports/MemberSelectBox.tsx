@@ -16,7 +16,9 @@ export function MemberSelectBox({
   onChange,
   className,
 }: MemberSelectBoxProps) {
-  const { data: membersList = [], isLoading } = useMembersList(true);
+  const { data, isLoading } = useMembersList(true);
+  // Defensive guard — never let a bad/unexpected response shape crash the UI
+  const membersList = useMemo(() => (Array.isArray(data) ? data : []), [data]);
   const [searchText, setSearchText] = useState("");
 
   // Filter members list based on search query

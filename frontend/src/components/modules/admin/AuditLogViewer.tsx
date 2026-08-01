@@ -7,20 +7,32 @@ import { TanstackDataTable } from "@/components/modules/common/tanstack-data-tab
 import { ColumnDef } from "@tanstack/react-table";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
+import { formatDateOnly } from "@/components/modules/common/tanstack-table-helpers";
 import type { AuditLogItem } from "@/types/admin.types";
 
 const columns: ColumnDef<AuditLogItem>[] = [
   {
     accessorKey: "createdAt",
-    header: "Timestamp",
-    cell: ({ getValue }) => new Date(getValue() as string).toLocaleString(),
+    header: "Date",
+    enableSorting: true,
+    cell: ({ getValue }) => {
+      const value = getValue();
+      if (!value) return "—";
+      try {
+        return formatDateOnly(value as string);
+      } catch (e) {
+        console.error("Date formatting error:", e, "Value:", value);
+        return String(value);
+      }
+    },
   },
-  { accessorKey: "action", header: "Action" },
-  { accessorKey: "entity", header: "Entity" },
-  { accessorKey: "userEmail", header: "User" },
+  { accessorKey: "action", header: "Action", enableSorting: true },
+  { accessorKey: "entity", header: "Entity", enableSorting: true },
+  { accessorKey: "userEmail", header: "User", enableSorting: true },
   {
     accessorKey: "entityId",
     header: "Entity ID",
+    enableSorting: false,
     cell: ({ getValue }) => (getValue() as string) ?? "—",
   },
 ];
@@ -58,6 +70,7 @@ export function AuditLogViewer() {
         </p>
       </div>
 
+     <h2 className="text-xl font-semibold">Audit Logs</h2>
       <TanstackDataTable
         columns={columns}
         data={data?.data ?? []}

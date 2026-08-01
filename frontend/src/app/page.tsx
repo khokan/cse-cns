@@ -7,7 +7,7 @@ export const dynamic = "force-dynamic";
 export default function HomePageMain() {  
     return (
             <>
-             <Navbar />
-             <Footer /> 
+              <Navbar /> 
+               <Footer />
             </>)
 }   

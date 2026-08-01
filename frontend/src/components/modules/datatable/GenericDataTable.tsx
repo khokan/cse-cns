@@ -5,6 +5,7 @@ import { ColumnDef } from "@tanstack/react-table";
 import { Plus, Pencil, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { TanstackDataTable } from "@/components/modules/common/tanstack-data-table";
+import { DateFormatter } from "@/utils/tanstack-table-helpers";
 import {
   RowCreateEditDialog,
   FieldSchema,
@@ -23,12 +24,7 @@ export type GenericDataTableProps = {
   isSubmitting?: boolean;
 };
 
-function formatCellValue(value: unknown): string {
-  if (value === null || value === undefined) return "—";
-  if (value instanceof Date) return value.toLocaleString();
-  if (typeof value === "boolean") return value ? "Yes" : "No";
-  return String(value);
-}
+
 
 export function GenericDataTable({
   table,
@@ -65,7 +61,8 @@ export function GenericDataTable({
     const cols = keys.map((key) => ({
       accessorKey: key,
       header: key,
-      cell: ({ getValue }: { getValue: () => unknown }) => formatCellValue(getValue()),
+      cell: ({ getValue }: { getValue: () => unknown }) =>
+        DateFormatter.cell(getValue()),
     }));
     return cols;
   }, [keys]);
@@ -130,15 +127,15 @@ export function GenericDataTable({
         renderRowActions={
           canWrite
             ? (row) => (
-                <div className="flex items-center justify-end gap-2">
-                  <Button variant="ghost" size="icon" onClick={() => handleEdit(row)}>
-                    <Pencil className="h-4 w-4" />
-                  </Button>
-                  <Button variant="ghost" size="icon" onClick={() => handleDelete(row)}>
-                    <Trash2 className="h-4 w-4 text-destructive" />
-                  </Button>
-                </div>
-              )
+              <div className="flex items-center justify-end gap-2">
+                <Button variant="ghost" size="icon" onClick={() => handleEdit(row)}>
+                  <Pencil className="h-4 w-4" />
+                </Button>
+                <Button variant="ghost" size="icon" onClick={() => handleDelete(row)}>
+                  <Trash2 className="h-4 w-4 text-destructive" />
+                </Button>
+              </div>
+            )
             : undefined
         }
       />

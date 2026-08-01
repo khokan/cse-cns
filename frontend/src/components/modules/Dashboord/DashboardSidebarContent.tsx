@@ -37,8 +37,8 @@ const DashboardSidebarContent = ({dashboardHome, navItems, userInfo} : Dashboard
       </div>
 
       {/* Navigation Area */}
-      <ScrollArea className="flex-1 px-3 py-4">
-        <nav className="space-y-6">
+      <ScrollArea className="flex-1 px-3 py-2">
+        <nav className="space-y-3">
           {navItems.map((section, sectionId) => (
             <div key={sectionId}>
               {section.title && (
@@ -58,7 +58,7 @@ const DashboardSidebarContent = ({dashboardHome, navItems, userInfo} : Dashboard
                       href={item.href}
                       key={id}
                       className={cn(
-                        "flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-all",
+                        "flex items-center gap-1 rounded-xl px-2 py-1.5 text-sm font-medium transition-all",
                         isActive
                           ? "bg-primary text-primary-foreground shadow-sm"
                           : "text-muted-foreground hover:bg-accent/70 hover:text-accent-foreground",
@@ -72,7 +72,7 @@ const DashboardSidebarContent = ({dashboardHome, navItems, userInfo} : Dashboard
               </div>
 
               {sectionId < navItems.length - 1 && (
-                <Separator className="my-4" />
+                <Separator className="my-" />
               )}
             </div>
           ))}

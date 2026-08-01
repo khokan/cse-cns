@@ -37,7 +37,7 @@ const DashboardNavbarContent = ({dashboardHome, navItems, userInfo} : DashboardN
     }, []);
 
   return (
-    <div className="flex items-center gap-4 w-full px-4 py-3 border-b bg-background">
+    <div className="flex h-16 w-full items-center gap-4 border-b bg-background px-4 py-3">
       <div className="flex items-center gap-4">
           {/* Mobile Menu Toggle Button And Menu */}
           <Sheet open={isOpen && isMobile} onOpenChange={setIsOpen}>

@@ -87,8 +87,9 @@ const requestReport = async (
                 : fallbackUserId;
 
             const bQueueJobId = uuidv4();
+            const { selectedMemberIds: _omitSelectedIds, isBulk: _omitIsBulk, ...restFilters } = filters;
             const memberFilters = {
-                ...filters,
+                ...restFilters,
                 trecHolderId: memberId,
                 memberCode: m.MemberCode ?? memberId,
             };
@@ -147,6 +148,11 @@ const requestReport = async (
             filters.trecHolderId = userId;
         }
     }
+
+    // Never persist selectedMemberIds/isBulk in the filters column — only
+    // trecHolderId is needed to look up/search a trecholder's own reports.
+    delete filters.selectedMemberIds;
+    delete filters.isBulk;
 
     const requestingUser = await db.cnsWeb.user.findUnique({
         where: { id: userId },
@@ -240,7 +246,7 @@ const getJobs = async (
         ? {
               OR: [
                   { userId },
-                  { filters: { contains: `"${userTrecId}"` } },
+                  { filters: { contains: `"trecHolderId":"${userTrecId}"` } },
               ],
           }
         : { userId };
@@ -300,7 +306,7 @@ const getJob = async (jobId: string, userId: string, userRole: string) => {
     const canAccess =
         job.userId === userId ||
         ["ADMIN", "IT"].includes(userRole) ||
-        (Boolean(userTrecId) && Boolean(job.filters?.includes(userTrecId!)));
+        (Boolean(userTrecId) && Boolean(job.filters?.includes(`"trecHolderId":"${userTrecId}"`)));
 
     if (!canAccess) {
         throw new AppError(

@@ -9,13 +9,14 @@ import { Toaster } from "sonner";
 import Navbar from "@/components/shared/navbar";
 import { ThemeProvider } from "@/components/providers/theme-provider";
 import QueryProviders from "@/components/providers/Queryprovider";
+import { PerformanceMonitor } from "@/components/providers/performance-monitor";
 
 export const metadata: Metadata = {
-  title: "CSE WEB",
-  description: "CSE WEB",
+  title: "CSE Insights",
+  description: "CSE Insights - Chittagong Stock Exchange",
   icons: {
-    icon: "/favicon.ico",
-    apple: "/favicon.svg",
+    icon: "/cse-ico.png",
+    apple: "/cse-ico.png",
   },
 };
 
@@ -25,9 +26,8 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       <body>
         <ThemeProvider>
           <QueryProviders>
-            <Navbar />
+            <PerformanceMonitor />
             <main className="min-h-[calc(100vh-170px)]">{children}</main>
-            <Footer />
             <Toaster richColors position="top-right" />
           </QueryProviders>
         </ThemeProvider>
