@@ -22,6 +22,16 @@ export type GenericDataTableProps = {
   onUpdate?: (id: string, payload: Record<string, unknown>) => void;
   onDelete?: (id: string) => void;
   isSubmitting?: boolean;
+
+  // Server-side pagination props (optional). When provided, the underlying
+  // TanstackDataTable switches to manual pagination mode so tables with
+  // thousands of rows (e.g. taxToNBR) page correctly against the server
+  // instead of only ever showing the first fetched page.
+  pageIndex?: number;
+  pageSize?: number;
+  totalRecords?: number;
+  onPageChange?: (pageIndex: number) => void;
+  onPageSizeChange?: (pageSize: number) => void;
 };
 
 export function GenericDataTable({
@@ -35,6 +45,11 @@ export function GenericDataTable({
   onUpdate,
   onDelete,
   isSubmitting,
+  pageIndex,
+  pageSize,
+  totalRecords,
+  onPageChange,
+  onPageSizeChange,
 }: GenericDataTableProps) {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingRow, setEditingRow] = useState<Record<string, unknown> | undefined>();
@@ -107,9 +122,9 @@ export function GenericDataTable({
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <div>
-          <h2 className="text-lg font-semibold capitalize">{table}</h2>
           <p className="text-sm text-muted-foreground">
-            {rows.length} row{rows.length === 1 ? "" : "s"} loaded
+            {totalRecords ?? rows.length} row{(totalRecords ?? rows.length) === 1 ? "" : "s"}{" "}
+            {totalRecords !== undefined ? "total" : "loaded"}
           </p>
         </div>
         <div className="flex items-center gap-2">
@@ -134,6 +149,12 @@ export function GenericDataTable({
         isLoading={isLoading}
         hideEmptyColumnsInitially={false}
         noDataText={isLoading ? "Loading..." : "No records found."}
+        manualPagination={onPageChange !== undefined}
+        pageIndex={pageIndex}
+        pageSize={pageSize}
+        totalRecords={totalRecords}
+        onPageChange={onPageChange}
+        onPageSizeChange={onPageSizeChange}
         renderRowActions={
           canWrite
             ? (row) => (

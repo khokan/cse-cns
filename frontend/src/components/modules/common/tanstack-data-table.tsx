@@ -107,6 +107,17 @@ export type DataTableProps<T extends object> = {
   stickyHeader?: boolean;
   onRowClick?: (item: T) => void;
   topRightActions?: React.ReactNode;
+
+  // Server-side (manual) pagination support. When enabled, the `data` prop
+  // is expected to contain only the current page's rows, and pagination
+  // controls are driven by `pageIndex`/`pageSize`/`totalRecords` instead of
+  // computing pagination over `data.length` locally.
+  manualPagination?: boolean;
+  pageIndex?: number;
+  pageSize?: number;
+  totalRecords?: number;
+  onPageChange?: (pageIndex: number) => void;
+  onPageSizeChange?: (pageSize: number) => void;
 };
 
 const DENSITY_STYLES: Record<TableDensity, { cell: string; header: string; action: string }> = {
@@ -489,6 +500,13 @@ export function TanstackDataTable<T extends object>({
   stickyHeader = false,
   onRowClick,
   topRightActions,
+
+  manualPagination = false,
+  pageIndex: controlledPageIndex,
+  pageSize: controlledPageSize,
+  totalRecords: controlledTotalRecords,
+  onPageChange,
+  onPageSizeChange,
 }: DataTableProps<T>) {
   // Stable empty fallbacks resolved inside the function (where T is known).
   // Using a module-level EMPTY_ARRAY cast here keeps the reference stable
@@ -582,25 +600,87 @@ export function TanstackDataTable<T extends object>({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [data, searchValue, filterValues]);
 
+  // In manual (server-side) pagination mode, `data` already represents just
+  // the current page fetched from the server, so we skip local filtering.
+  const effectiveData = manualPagination ? data : filteredData;
+
+  // Uncontrolled pagination fallback state — used only when manualPagination
+  // is enabled but the caller doesn't fully control pageIndex/pageSize.
+  const [uncontrolledPageIndex, setUncontrolledPageIndex] = React.useState(0);
+  const [uncontrolledPageSize, setUncontrolledPageSize] = React.useState(initialPageSize);
+
+  const currentPageIndex = manualPagination
+    ? controlledPageIndex ?? uncontrolledPageIndex
+    : undefined;
+  const currentPageSize = manualPagination
+    ? controlledPageSize ?? uncontrolledPageSize
+    : undefined;
+  const currentTotalRecords = manualPagination
+    ? controlledTotalRecords ?? data.length
+    : effectiveData.length;
+
+  const handlePaginationChange = React.useCallback(
+    (updater: Updater<{ pageIndex: number; pageSize: number }>) => {
+      const prev = {
+        pageIndex: currentPageIndex ?? 0,
+        pageSize: currentPageSize ?? initialPageSize,
+      };
+      const next = typeof updater === "function" ? updater(prev) : updater;
+
+      if (next.pageIndex !== prev.pageIndex) {
+        if (onPageChange) onPageChange(next.pageIndex);
+        else setUncontrolledPageIndex(next.pageIndex);
+      }
+      if (next.pageSize !== prev.pageSize) {
+        if (onPageSizeChange) onPageSizeChange(next.pageSize);
+        else setUncontrolledPageSize(next.pageSize);
+        // Changing page size should reset to first page
+        if (onPageChange) onPageChange(0);
+        else setUncontrolledPageIndex(0);
+      }
+    },
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [currentPageIndex, currentPageSize, initialPageSize, onPageChange, onPageSizeChange]
+  );
+
   // Table setup
   const table = useReactTable({
-    data: filteredData,
+    data: effectiveData,
     columns,
     state: {
       sorting,
       columnVisibility,
+      ...(manualPagination
+        ? {
+            pagination: {
+              pageIndex: currentPageIndex ?? 0,
+              pageSize: currentPageSize ?? initialPageSize,
+            },
+          }
+        : {}),
     },
     onSortingChange: setSorting,
     onColumnVisibilityChange: setColumnVisibility,
     getCoreRowModel: getCoreRowModel(),
     getSortedRowModel: getSortedRowModel(),
-    getPaginationRowModel: getPaginationRowModel(),
-    initialState: {
-      pagination: {
-        pageIndex: 0,
-        pageSize: initialPageSize,
-      },
-    },
+    ...(manualPagination
+      ? {
+          manualPagination: true,
+          pageCount: Math.max(
+            1,
+            Math.ceil((currentTotalRecords || 0) / (currentPageSize || initialPageSize))
+          ),
+          onPaginationChange: handlePaginationChange,
+        }
+      : {
+          getPaginationRowModel: getPaginationRowModel(),
+          initialState: {
+            pagination: {
+              pageIndex: 0,
+              pageSize: initialPageSize,
+            },
+          },
+        }),
   });
 
   // Stable ref to table.setPageIndex to call without including table in deps
@@ -608,9 +688,14 @@ export function TanstackDataTable<T extends object>({
   setPageIndexRef.current = table.setPageIndex;
 
   // Reset pagination to page 1 on search or filter change (no table in deps)
+  // Only applies in local (non-manual) pagination mode — in manual mode the
+  // caller is responsible for resetting the page (e.g. on search changes).
   React.useEffect(() => {
-    setPageIndexRef.current(0);
-  }, [searchValue, filterValues]);
+    if (!manualPagination) {
+      setPageIndexRef.current(0);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchValue, filterValues, manualPagination]);
 
   // Active filters helper
   const activeFiltersCount = React.useMemo(() => {

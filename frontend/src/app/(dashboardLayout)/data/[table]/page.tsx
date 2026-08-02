@@ -1,7 +1,7 @@
 "use client";
 
 import { useParams } from "next/navigation";
-import { useCallback } from "react";
+import { useCallback, useState } from "react";
 import { GenericDataTable } from "@/components/modules/datatable/GenericDataTable";
 import {
   useDatatableRows,
@@ -22,7 +22,18 @@ export default function DataTableDetailPage() {
   const params = useParams();
   const table = String(params.table ?? "");
 
-  const { data, isLoading, refetch } = useDatatableRows(table);
+  // Server-side pagination state. The backend already supports page/limit
+  // params (see datatable.service.ts), but this page was previously calling
+  // the hook with no params at all, so it always fetched only the first
+  // page (default limit=10) — for large tables like taxToNBR (1000+ rows)
+  // the in-table "pagination" was just re-slicing that same first page.
+  const [pageIndex, setPageIndex] = useState(0);
+  const [pageSize, setPageSize] = useState(10);
+
+  const { data, isLoading, refetch } = useDatatableRows(table, {
+    page: pageIndex + 1,
+    limit: pageSize,
+  });
   const createMutation = useCreateRow(table);
   const updateMutation = useUpdateRow(table);
   const deleteMutation = useDeleteRow(table);
@@ -30,6 +41,7 @@ export default function DataTableDetailPage() {
   const rows = (data?.data as Record<string, unknown>[] | undefined) ?? EMPTY_ROWS;
   const primaryKey = data?.meta?.primaryKey ?? "id";
   const canWrite = data?.meta?.canWrite ?? false;
+  const totalRecords = data?.meta?.total ?? 0;
 
   const handleRefresh = useCallback(() => refetch(), [refetch]);
   const handleCreate = useCallback(
@@ -45,6 +57,13 @@ export default function DataTableDetailPage() {
     (id: string) => deleteMutation.mutate(id),
     [deleteMutation]
   );
+  const handlePageChange = useCallback((newPageIndex: number) => {
+    setPageIndex(newPageIndex);
+  }, []);
+  const handlePageSizeChange = useCallback((newPageSize: number) => {
+    setPageSize(newPageSize);
+    setPageIndex(0);
+  }, []);
 
   return (
     <div className="mx-auto max-w-6xl space-y-6">
@@ -75,6 +94,11 @@ export default function DataTableDetailPage() {
         isSubmitting={
           createMutation.isPending || updateMutation.isPending || deleteMutation.isPending
         }
+        pageIndex={pageIndex}
+        pageSize={pageSize}
+        totalRecords={totalRecords}
+        onPageChange={handlePageChange}
+        onPageSizeChange={handlePageSizeChange}
       />
     </div>
   );
