@@ -2,12 +2,15 @@
 
 import { useMemo } from "react";
 import { ColumnDef } from "@tanstack/react-table";
+import { RotateCcw } from "lucide-react";
+import { Button } from "@/components/ui/button";
 import { TanstackDataTable } from "@/components/modules/common/tanstack-data-table";
 import type { SettlementRecord } from "@/types/settlement.types";
 
 export type SettlementTableProps = {
   settlements: SettlementRecord[];
   loading?: boolean;
+  onRefresh?: () => void;
   onRetry?: (contractNumber: string) => void;
   onBulkDelete?: (contractNumbers: string[]) => Promise<void>;
   onExport?: (contractNumbers?: string[]) => Promise<Blob>;
@@ -16,6 +19,7 @@ export type SettlementTableProps = {
 export function SettlementTable({
   settlements,
   loading,
+  onRefresh,
   onRetry,
   onBulkDelete,
   onExport,
@@ -85,6 +89,19 @@ export function SettlementTable({
       initialPageSize={10}
       pageSizeOptions={[5, 10, 20, 50]}
       noDataText={loading ? "Loading settlements..." : "No settlement records found."}
+      topRightActions={
+        onRefresh ? (
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={onRefresh}
+            className="h-8 gap-1.5 text-xs font-medium border-border/80 shadow-xs"
+          >
+            <RotateCcw className="h-3.5 w-3.5 text-muted-foreground" />
+            Refresh
+          </Button>
+        ) : undefined
+      }
       renderRowActions={
         onRetry
           ? (row) => (

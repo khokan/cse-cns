@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { ColumnDef } from "@tanstack/react-table";
 import { Plus, Pencil, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -24,8 +24,6 @@ export type GenericDataTableProps = {
   isSubmitting?: boolean;
 };
 
-
-
 export function GenericDataTable({
   table,
   rows,
@@ -41,10 +39,21 @@ export function GenericDataTable({
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingRow, setEditingRow] = useState<Record<string, unknown> | undefined>();
 
-  const keys = useMemo(() => {
-    const set = new Set<string>();
-    rows.forEach((row) => Object.keys(row).forEach((k) => set.add(k)));
-    return Array.from(set);
+  // Accumulate column keys over time so they don't disappear during
+  // intermediate empty-rows states (e.g. loading, refetch).
+  const knownKeysRef = useRef<string[]>([]);
+  const [keys, setKeys] = useState<string[]>([]);
+
+  useEffect(() => {
+    if (rows.length === 0) return;
+    const existing = new Set(knownKeysRef.current);
+    const prev = existing.size;
+    rows.forEach((row) => Object.keys(row).forEach((k) => existing.add(k)));
+    if (existing.size !== prev) {
+      const updated = Array.from(existing);
+      knownKeysRef.current = updated;
+      setKeys(updated);
+    }
   }, [rows]);
 
   const fields: FieldSchema[] = useMemo(
@@ -58,13 +67,12 @@ export function GenericDataTable({
   );
 
   const columns: ColumnDef<Record<string, unknown>>[] = useMemo(() => {
-    const cols = keys.map((key) => ({
+    return keys.map((key) => ({
       accessorKey: key,
       header: key,
       cell: ({ getValue }: { getValue: () => unknown }) =>
         DateFormatter.cell(getValue()),
     }));
-    return cols;
   }, [keys]);
 
   const handleEdit = (row: Record<string, unknown>) => {
@@ -123,6 +131,8 @@ export function GenericDataTable({
         data={rows}
         title=""
         searchKeys={keys}
+        isLoading={isLoading}
+        hideEmptyColumnsInitially={false}
         noDataText={isLoading ? "Loading..." : "No records found."}
         renderRowActions={
           canWrite

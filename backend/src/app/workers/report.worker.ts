@@ -347,22 +347,43 @@ export async function processReportJob(payload: ReportJobPayload): Promise<void>
 // ---------------------------------------------------------------------------
 export let reportWorker: Worker<ReportJobPayload> | null = null;
 
-export const initReportWorker = (): Worker<ReportJobPayload> => {
-    reportWorker = new Worker<ReportJobPayload>(
-        REPORT_QUEUE_NAME,
-        async (job: Job<ReportJobPayload>) => {
-            await processReportJob(job.data);
-        },
-        { connection: bullMqRedisConnection }
-    );
+export const initReportWorker = (): Worker<ReportJobPayload> | null => {
+    try {
+        reportWorker = new Worker<ReportJobPayload>(
+            REPORT_QUEUE_NAME,
+            async (job: Job<ReportJobPayload>) => {
+                await processReportJob(job.data);
+            },
+            { connection: bullMqRedisConnection }
+        );
 
-    reportWorker.on("completed", (job) => {
-        logger.info(`✅ [ReportWorker] Job ${job.id} marked as completed in BullMQ.`);
-    });
+        reportWorker.on("completed", (job) => {
+            logger.info(`✅ [ReportWorker] Job ${job.id} marked as completed in BullMQ.`);
+        });
 
-    reportWorker.on("failed", (job, err) => {
-        logger.error(`❌ [ReportWorker] Job ${job?.id} failed in BullMQ:`, err.message);
-    });
+        reportWorker.on("failed", (job, err) => {
+            logger.error(`❌ [ReportWorker] Job ${job?.id} failed in BullMQ:`, err.message);
+        });
 
-    return reportWorker;
+        reportWorker.on("error", (err) => {
+            const code = (err as NodeJS.ErrnoException).code;
+            const msg = err.message || "";
+            const isTransient =
+                code === "ECONNRESET" ||
+                code === "ECONNREFUSED" ||
+                code === "ETIMEDOUT" ||
+                msg.includes("Stream isn't writeable") ||
+                msg.includes("enableOfflineQueue");
+            if (isTransient) {
+                // Transient during Redis offline/restart — BullMQ auto-reconnects and system uses direct fallbacks
+                return;
+            }
+            logger.warn(`⚠️ [ReportWorker] Worker error: ${err.message}`);
+        });
+
+        return reportWorker;
+    } catch (err) {
+        logger.warn("⚠️ [ReportWorker] Could not initialize BullMQ report worker (Redis offline). System will use fallback direct execution.");
+        return null;
+    }
 };

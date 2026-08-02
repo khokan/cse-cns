@@ -33,15 +33,20 @@ const nextConfig: NextConfig = {
   },
 };
 
-// Only apply Sentry wrapper in production builds
-// In development, Sentry is NOT initialized at build time
-const config = process.env.NODE_ENV === "production"
-  ? withSentryConfig(nextConfig, {
-      org: process.env.SENTRY_ORG || "learner-va",
-      project: process.env.SENTRY_PROJECT || "cse-cns",
-      authToken: process.env.SENTRY_AUTH_TOKEN,
-      silent: false,
-    })
-  : nextConfig;
+// Next.js CLI ALWAYS sets process.env.NODE_ENV = "production" during `next build`, 
+// even if NODE_ENV=development is set in .env.
+// To stop uploading sourcemaps during local builds/dev, use `sourcemaps: { disable: true }`
+// or require an explicit flag like `SENTRY_UPLOAD_SOURCEMAPS=true`.
+const shouldUploadSourcemaps = process.env.SENTRY_UPLOAD_SOURCEMAPS === "true";
+
+const config = withSentryConfig(nextConfig, {
+  org: process.env.SENTRY_ORG || "learner-va",
+  project: process.env.SENTRY_PROJECT || "cse-cns",
+  authToken: process.env.SENTRY_AUTH_TOKEN,
+  silent: !shouldUploadSourcemaps,
+  sourcemaps: {
+    disable: !shouldUploadSourcemaps,
+  },
+});
 
 export default config;

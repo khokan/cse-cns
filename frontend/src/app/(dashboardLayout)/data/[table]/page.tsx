@@ -1,6 +1,7 @@
 "use client";
 
 import { useParams } from "next/navigation";
+import { useCallback } from "react";
 import { GenericDataTable } from "@/components/modules/datatable/GenericDataTable";
 import {
   useDatatableRows,
@@ -12,6 +13,11 @@ import { Button } from "@/components/ui/button";
 import { ArrowLeft } from "lucide-react";
 import Link from "next/link";
 
+// Stable empty array — avoids creating a new reference on every render when
+// data is not yet loaded, which would cause GenericDataTable's useEffect to
+// re-run unnecessarily.
+const EMPTY_ROWS: Record<string, unknown>[] = [];
+
 export default function DataTableDetailPage() {
   const params = useParams();
   const table = String(params.table ?? "");
@@ -21,9 +27,24 @@ export default function DataTableDetailPage() {
   const updateMutation = useUpdateRow(table);
   const deleteMutation = useDeleteRow(table);
 
-  const handleUpdate = (id: string, payload: Record<string, unknown>) => {
-    updateMutation.mutate({ id, payload });
-  };
+  const rows = (data?.data as Record<string, unknown>[] | undefined) ?? EMPTY_ROWS;
+  const primaryKey = data?.meta?.primaryKey ?? "id";
+  const canWrite = data?.meta?.canWrite ?? false;
+
+  const handleRefresh = useCallback(() => refetch(), [refetch]);
+  const handleCreate = useCallback(
+    (payload: Record<string, unknown>) => createMutation.mutate(payload),
+    [createMutation]
+  );
+  const handleUpdate = useCallback(
+    (id: string, payload: Record<string, unknown>) =>
+      updateMutation.mutate({ id, payload }),
+    [updateMutation]
+  );
+  const handleDelete = useCallback(
+    (id: string) => deleteMutation.mutate(id),
+    [deleteMutation]
+  );
 
   return (
     <div className="mx-auto max-w-6xl space-y-6">
@@ -43,14 +64,14 @@ export default function DataTableDetailPage() {
 
       <GenericDataTable
         table={table}
-        rows={(data?.data ?? []) as Record<string, unknown>[]}
-        primaryKey={data?.meta.primaryKey ?? "id"}
-        canWrite={data?.meta.canWrite ?? false}
+        rows={rows}
+        primaryKey={primaryKey}
+        canWrite={canWrite}
         isLoading={isLoading}
-        onRefresh={() => refetch()}
-        onCreate={(payload) => createMutation.mutate(payload)}
+        onRefresh={handleRefresh}
+        onCreate={handleCreate}
         onUpdate={handleUpdate}
-        onDelete={(id) => deleteMutation.mutate(id)}
+        onDelete={handleDelete}
         isSubmitting={
           createMutation.isPending || updateMutation.isPending || deleteMutation.isPending
         }

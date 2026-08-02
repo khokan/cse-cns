@@ -5,13 +5,14 @@ import { db } from "../lib/prisma.js";
 import type { SettlementJobPayload } from "../modules/settlement/settlement.interface.js";
 import { emitToUser } from "../lib/socket.js";
 import { writeAuditLog } from "../utils/auditLog.js";
+import logger from "../utils/logger.js";
 
 export let settlementWorker: Worker<SettlementJobPayload> | null = null;
 
 export const processSettlementJob = async (payload: SettlementJobPayload): Promise<void> => {
     const { contractNumber, initiatedBy, data } = payload;
 
-    console.log(`⚖️ [SettlementWorker] Processing settlement for ContractNumber: ${contractNumber}`);
+    logger.info(`⚖️ [SettlementWorker] Processing settlement for ContractNumber: ${contractNumber}`);
 
     emitToUser(initiatedBy, "settlement:status", {
         contractNumber,
@@ -59,10 +60,10 @@ export const processSettlementJob = async (payload: SettlementJobPayload): Promi
             status: "SETTLED",
         });
 
-        console.log(`✅ [SettlementWorker] Settlement ${contractNumber} completed successfully.`);
+        logger.info(`✅ [SettlementWorker] Settlement ${contractNumber} completed successfully.`);
     } catch (err) {
         const errorMessage = err instanceof Error ? err.message : String(err);
-        console.error(`❌ [SettlementWorker] Settlement ${contractNumber} failed:`, errorMessage);
+        logger.error(`❌ [SettlementWorker] Settlement ${contractNumber} failed:`, errorMessage);
 
         emitToUser(initiatedBy, "settlement:status", {
             contractNumber,
@@ -73,22 +74,43 @@ export const processSettlementJob = async (payload: SettlementJobPayload): Promi
     }
 };
 
-export const initSettlementWorker = (): Worker<SettlementJobPayload> => {
-    settlementWorker = new Worker<SettlementJobPayload>(
-        SETTLEMENT_QUEUE_NAME,
-        async (job: Job<SettlementJobPayload>) => {
-            await processSettlementJob(job.data);
-        },
-        { connection: bullMqRedisConnection }
-    );
+export const initSettlementWorker = (): Worker<SettlementJobPayload> | null => {
+    try {
+        settlementWorker = new Worker<SettlementJobPayload>(
+            SETTLEMENT_QUEUE_NAME,
+            async (job: Job<SettlementJobPayload>) => {
+                await processSettlementJob(job.data);
+            },
+            { connection: bullMqRedisConnection }
+        );
 
-    settlementWorker.on("completed", (job) => {
-        console.log(`✅ [SettlementWorker] Job ${job.id} completed in BullMQ.`);
-    });
+        settlementWorker.on("completed", (job) => {
+            logger.info(`✅ [SettlementWorker] Job ${job.id} completed in BullMQ.`);
+        });
 
-    settlementWorker.on("failed", (job, err) => {
-        console.error(`❌ [SettlementWorker] Job ${job?.id} failed in BullMQ:`, err.message);
-    });
+        settlementWorker.on("failed", (job, err) => {
+            logger.error(`❌ [SettlementWorker] Job ${job?.id} failed in BullMQ:`, err.message);
+        });
 
-    return settlementWorker;
+        settlementWorker.on("error", (err) => {
+            const code = (err as NodeJS.ErrnoException).code;
+            const msg = err.message || "";
+            const isTransient =
+                code === "ECONNRESET" ||
+                code === "ECONNREFUSED" ||
+                code === "ETIMEDOUT" ||
+                msg.includes("Stream isn't writeable") ||
+                msg.includes("enableOfflineQueue");
+            if (isTransient) {
+                // Transient during Redis offline/restart — BullMQ auto-reconnects and system uses direct fallbacks
+                return;
+            }
+            logger.warn(`⚠️ [SettlementWorker] Worker error: ${err.message}`);
+        });
+
+        return settlementWorker;
+    } catch (err) {
+        logger.warn("⚠️ [SettlementWorker] Could not initialize BullMQ settlement worker (Redis offline). System will use fallback direct execution.");
+        return null;
+    }
 };

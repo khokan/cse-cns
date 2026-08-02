@@ -8,7 +8,7 @@ import status from "http-status";
 const getAccessibleTables = catchAsync(async (req: Request, res: Response) => {
     const userRole = req.user!.role as any;
     const result = DatatableService.getAccessibleTables(userRole);
-
+    console.log("Accessible tables for role", userRole, ":", result);
     sendResponse(res, {
         httpStatusCode: status.OK,
         success: true,

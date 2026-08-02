@@ -6,7 +6,7 @@ import { seedSuperAdmin } from "./app/utils/seed.js";
 import { initSocketServer } from "./app/lib/socket.js";
 import { initReportWorker, reportWorker } from "./app/workers/report.worker.js";
 import { initSettlementWorker, settlementWorker } from "./app/workers/settlement.worker.js";
-import { redisClient } from "./app/lib/redis.js";
+import { redisClient, bullMqRedisConnection, connectRedis } from "./app/lib/redis.js";
 import logger from "./app/utils/logger.js";
 import { initSentry } from "./app/lib/sentry.js";
 
@@ -28,10 +28,17 @@ const bootstrap = async () => {
         // Initialize Socket.IO server
         initSocketServer(server);
 
-        // Initialize BullMQ Workers
-        initReportWorker();
-        initSettlementWorker();
-        logger.info("⚙️  [Workers] ReportWorker and SettlementWorker started successfully.");
+        // Connect to Redis in the background — app proceeds regardless
+        connectRedis();
+
+        // Initialize BullMQ Workers gracefully
+        try {
+            initReportWorker();
+            initSettlementWorker();
+            logger.info("⚙️  [Workers] ReportWorker and SettlementWorker initialized.");
+        } catch (workerError) {
+            logger.warn("⚠️ [Workers] BullMQ workers startup bypassed (Redis offline). System operating with direct fallback.");
+        }
     } catch (error) {
         logger.error("❌ Failed to start server:", error);
         process.exit(1);
@@ -44,9 +51,18 @@ const gracefulShutdown = async (signal: string, error?: unknown) => {
         logger.error("Error details:", error);
     }
 
-    if (reportWorker) await reportWorker.close();
-    if (settlementWorker) await settlementWorker.close();
-    if (redisClient) redisClient.disconnect();
+    if (reportWorker) {
+        try { await reportWorker.close(); } catch {}
+    }
+    if (settlementWorker) {
+        try { await settlementWorker.close(); } catch {}
+    }
+    if (redisClient) {
+        try { redisClient.disconnect(); } catch {}
+    }
+    if (bullMqRedisConnection) {
+        try { bullMqRedisConnection.disconnect(); } catch {}
+    }
 
     if (server) {
         server.close(async () => {

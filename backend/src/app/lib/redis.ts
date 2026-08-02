@@ -6,87 +6,119 @@ type RedisError = Error & { code?: string };
 
 const getErrorCode = (err: RedisError): string => err.code ?? "UNKNOWN";
 
+let hasLoggedRedisError = false;
+let hasLoggedBullMqError = false;
+
 const redisOptions = {
-    enableReadyCheck: true,
-    lazyConnect: false,
+    enableReadyCheck: false,
+    lazyConnect: true,
+    enableOfflineQueue: false,
     reconnectOnError: (err: RedisError) => {
         const code = getErrorCode(err);
-        const fatal = ["ECONNREFUSED", "EAI_AGAIN", "ENOTFOUND"].includes(code);
-        logger.warn(`⚠️ [Redis] reconnectOnError: ${code} — ${fatal ? "abort" : "retry"}`);
-        return !fatal;
+        logger.warn(`⚠️ [Redis] Connection error (${code}) — retrying in background.`);
+        return true; // Keep retrying in background
     },
     retryStrategy: (times: number) => {
-        if (times > 5) {
-            logger.error("❌ [Redis] Max reconnection attempts reached.");
-            return null;
+        if (times === 1 && !hasLoggedRedisError) {
+            logger.warn(`⚠️ [Redis] Connection unavailable at ${envVars.REDIS_URL.replace(/:\/\/.*@/, "://***@")}. System running with direct database queries & fallback job execution.`);
         }
-        const delay = Math.min(times * 500, 3000);
-        logger.info(`🔁 [Redis] Reconnecting in ${delay}ms... (attempt ${times})`);
+        const delay = Math.min(times * 1000, 5000);
         return delay;
     },
 };
 
-// Cache/general-purpose Redis client with retries
-// commandTimeout ensures a GET/SET never hangs indefinitely (e.g. while Redis
-// is disconnected/reconnecting) — commands reject after N ms instead of
-// sitting in ioredis' offline queue forever, which previously caused API
-// requests like /reports/members to hang for minutes/hours.
+// Cache/general-purpose Redis client
 export const redisClient = new Redis(envVars.REDIS_URL, {
     ...redisOptions,
-    maxRetriesPerRequest: 3,
-    commandTimeout: 3000,
+    maxRetriesPerRequest: 1,
+    commandTimeout: 2000,
 });
 
-// Dedicated BullMQ connection: blocking commands require maxRetriesPerRequest = null
+// Dedicated BullMQ connection
 export const bullMqRedisConnection = new Redis(envVars.REDIS_URL, {
     ...redisOptions,
     maxRetriesPerRequest: null,
 });
 
+/**
+ * Initiates Redis connections in the background.
+ * Errors are intentionally swallowed here — the 'error' event listeners
+ * on each client handle logging. The app proceeds normally without Redis.
+ */
+export function connectRedis(): void {
+    redisClient.connect().catch(() => { /* handled by 'error' event */ });
+    bullMqRedisConnection.connect().catch(() => { /* handled by 'error' event */ });
+}
+
+export function isRedisConnected(): boolean {
+    return redisClient.status === "ready" || redisClient.status === "connect";
+}
+
+export function isBullMqRedisConnected(): boolean {
+    return bullMqRedisConnection.status === "ready" || bullMqRedisConnection.status === "connect";
+}
+
 redisClient.on("error", (err) => {
-    logger.error("❌ [Redis] Connection error:", getErrorCode(err), err.message);
+    if (!hasLoggedRedisError) {
+        logger.warn(`⚠️ [Redis] Connection notice: ${err.message}. System continuing normally without cache.`);
+        hasLoggedRedisError = true;
+    }
+});
+
+redisClient.on("ready", () => {
+    hasLoggedRedisError = false;
+    logger.info("✅ [Redis] Connection established & ready.");
 });
 
 redisClient.on("connect", () => {
-    logger.info("✅ [Redis] Connected to", envVars.REDIS_URL.replace(/:\/\/.*@/, "://***@"));
-});
-
-redisClient.on("reconnecting", () => {
-    logger.info("🔁 [Redis] Reconnecting...");
+    hasLoggedRedisError = false;
+    logger.info("✅ [Redis] Connected to Redis server.");
 });
 
 bullMqRedisConnection.on("error", (err) => {
-    logger.error("❌ [BullMQ Redis] Connection error:", getErrorCode(err), err.message);
+    if (!hasLoggedBullMqError) {
+        logger.warn(`⚠️ [BullMQ Redis] Connection notice: ${err.message}. System continuing normally with direct queue fallback.`);
+        hasLoggedBullMqError = true;
+    }
+});
+
+bullMqRedisConnection.on("ready", () => {
+    hasLoggedBullMqError = false;
+    logger.info("✅ [BullMQ Redis] Connection ready.");
 });
 
 bullMqRedisConnection.on("connect", () => {
-    logger.info("✅ [BullMQ Redis] Connected");
+    hasLoggedBullMqError = false;
+    logger.info("✅ [BullMQ Redis] Connected.");
 });
 
-// Generic JSON cache helpers
+// Generic JSON cache helpers with safe connection checks
 export async function cacheGet<T>(key: string): Promise<T | null> {
     try {
+        if (!isRedisConnected()) return null;
         const data = await redisClient.get(key);
         return data ? JSON.parse(data) : null;
     } catch (err) {
-        logger.error(`[Redis] Failed to get key ${key}:`, err);
+        logger.warn(`[Redis] Cache miss/get error for key ${key}:`, (err as Error).message);
         return null;
     }
 }
 
 export async function cacheSet<T>(key: string, value: T, ttlSeconds: number): Promise<void> {
     try {
+        if (!isRedisConnected()) return;
         await redisClient.set(key, JSON.stringify(value), "EX", ttlSeconds);
     } catch (err) {
-        logger.error(`[Redis] Failed to set key ${key}:`, err);
+        logger.warn(`[Redis] Cache set error for key ${key}:`, (err as Error).message);
     }
 }
 
 export async function cacheDel(key: string): Promise<void> {
     try {
+        if (!isRedisConnected()) return;
         await redisClient.del(key);
     } catch (err) {
-        logger.error(`[Redis] Failed to delete key ${key}:`, err);
+        logger.warn(`[Redis] Cache delete error for key ${key}:`, (err as Error).message);
     }
 }
 
