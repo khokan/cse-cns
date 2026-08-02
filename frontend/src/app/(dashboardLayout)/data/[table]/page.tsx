@@ -2,7 +2,7 @@
 
 import { useParams } from "next/navigation";
 import { useCallback, useState } from "react";
-import { GenericDataTable } from "@/components/modules/datatable/GenericDataTable";
+import { GenericDataTable } from "@/components/modules/dataTable/GenericDataTable";
 import {
   useDatatableRows,
   useCreateRow,

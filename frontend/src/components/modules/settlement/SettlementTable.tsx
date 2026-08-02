@@ -4,7 +4,7 @@ import { useMemo } from "react";
 import { ColumnDef } from "@tanstack/react-table";
 import { RotateCcw } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { TanstackDataTable } from "@/components/modules/common/tanstack-data-table";
+import { TanstackDataTable } from "@/components/modules/dataTable/tanstack-data-table";
 import type { SettlementRecord } from "@/types/settlement.types";
 
 export type SettlementTableProps = {

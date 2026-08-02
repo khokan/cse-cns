@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { getUsers, updateUser, deleteUser } from "@/services/admin.service";
-import { TanstackDataTable } from "@/components/modules/common/tanstack-data-table";
+import { TanstackDataTable } from "@/components/modules/dataTable/tanstack-data-table";
 import { ColumnDef } from "@tanstack/react-table";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";

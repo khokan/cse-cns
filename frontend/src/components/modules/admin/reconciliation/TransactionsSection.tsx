@@ -3,7 +3,7 @@
 import { useMemo } from "react";
 import type { ColumnDef } from "@tanstack/react-table";
 import { Badge } from "@/components/ui/badge";
-import { TanstackDataTable } from "@/components/modules/common/tanstack-data-table";
+import { TanstackDataTable } from "@/components/modules/dataTable/tanstack-data-table";
 import { DateFormatter } from "@/utils/tanstack-table-helpers";
 import { cn } from "@/utils/utils";
 import type { TransactionSummaryRow } from "@/types/reconciliation.types";

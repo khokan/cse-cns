@@ -4,7 +4,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { ColumnDef } from "@tanstack/react-table";
 import { Plus, Pencil, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { TanstackDataTable } from "@/components/modules/common/tanstack-data-table";
+import { TanstackDataTable } from "@/components/modules/dataTable/tanstack-data-table";
 import { DateFormatter } from "@/utils/tanstack-table-helpers";
 import {
   RowCreateEditDialog,
@@ -57,13 +57,20 @@ export function GenericDataTable({
   // Accumulate column keys over time so they don't disappear during
   // intermediate empty-rows states (e.g. loading, refetch).
   const knownKeysRef = useRef<string[]>([]);
+  
+  // Initialize keys from rows - start with empty and populate from first render with data
   const [keys, setKeys] = useState<string[]>([]);
 
+  // On mount and when rows change, sync keys
   useEffect(() => {
-    if (rows.length === 0) return;
+    if (rows.length === 0) {
+      return;
+    }
+    
     const existing = new Set(knownKeysRef.current);
     const prev = existing.size;
     rows.forEach((row) => Object.keys(row).forEach((k) => existing.add(k)));
+    
     if (existing.size !== prev) {
       const updated = Array.from(existing);
       knownKeysRef.current = updated;
@@ -87,6 +94,7 @@ export function GenericDataTable({
       header: key,
       cell: ({ getValue }: { getValue: () => unknown }) =>
         DateFormatter.cell(getValue()),
+      enableHiding: true,
     }));
   }, [keys]);
 

@@ -18,7 +18,7 @@ import {
 import type { ColumnDef } from "@tanstack/react-table";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { TanstackDataTable } from "@/components/modules/common/tanstack-data-table";
+import { TanstackDataTable } from "@/components/modules/dataTable/tanstack-data-table";
 import { DateFormatter } from "@/utils/tanstack-table-helpers";
 import type { CashFlowSummaryRow } from "@/types/reconciliation.types";
 import { formatBDT, formatCompactBDT } from "./format";
