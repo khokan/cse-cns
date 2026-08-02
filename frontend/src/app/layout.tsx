@@ -1,5 +1,6 @@
 import "./globals.css";
 import type { Metadata } from "next";
+import { NuqsAdapter } from 'nuqs/adapters/next/pages'
 
 // app/layout.tsx
 export const dynamic = "force-dynamic";
@@ -27,8 +28,10 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <ThemeProvider>
           <QueryProviders>
             <PerformanceMonitor />
-            <main className="min-h-[calc(100vh-170px)]">{children}</main>
-            <Toaster richColors position="top-right" />
+            <NuqsAdapter>
+              <main className="min-h-[calc(100vh-170px)]">{children}</main>
+              <Toaster richColors position="top-right" />
+            </NuqsAdapter>
           </QueryProviders>
         </ThemeProvider>
       </body>
