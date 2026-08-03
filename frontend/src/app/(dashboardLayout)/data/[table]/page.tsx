@@ -1,8 +1,10 @@
 "use client";
 
-import { useParams } from "next/navigation";
-import { useCallback, useState } from "react";
-import { GenericDataTable } from "@/components/modules/dataTable/GenericDataTable";
+import { useParams, useSearchParams } from "next/navigation";
+import { useCallback, useMemo } from "react";
+import { parseAsInteger, useQueryState } from "nuqs";
+import { DataTableGeneric } from "@/components/modules/common/data-table-generic";
+import { getSortingStateParser } from "@/lib/parsers";
 import {
   useDatatableRows,
   useCreateRow,
@@ -14,26 +16,67 @@ import { ArrowLeft } from "lucide-react";
 import Link from "next/link";
 
 // Stable empty array — avoids creating a new reference on every render when
-// data is not yet loaded, which would cause GenericDataTable's useEffect to
+// data is not yet loaded, which would cause the table's useEffect to
 // re-run unnecessarily.
 const EMPTY_ROWS: Record<string, unknown>[] = [];
+
+// Query keys owned/written by `useDataTable` (inside `DataTableGeneric`)
+// that should NOT be forwarded as per-column `where` filters to the backend.
+const RESERVED_QUERY_KEYS = new Set([
+  "page",
+  "perPage",
+  "sort",
+  "filters",
+  "joinOperator",
+]);
 
 export default function DataTableDetailPage() {
   const params = useParams();
   const table = String(params.table ?? "");
+  const searchParams = useSearchParams();
 
-  // Server-side pagination state. The backend already supports page/limit
-  // params (see datatable.service.ts), but this page was previously calling
-  // the hook with no params at all, so it always fetched only the first
-  // page (default limit=10) — for large tables like taxToNBR (1000+ rows)
-  // the in-table "pagination" was just re-slicing that same first page.
-  const [pageIndex, setPageIndex] = useState(0);
-  const [pageSize, setPageSize] = useState(10);
+  // Page/perPage/sort/per-column filters all live in the URL under the same
+  // keys `useDataTable` uses internally. We only read them here to build the
+  // server fetch params; the table UI owns writing to these query params
+  // when the user paginates/sorts/filters, so the two stay in sync (and the
+  // view is bookmarkable/shareable).
+  const [page] = useQueryState("page", parseAsInteger.withDefault(1));
+  const [perPage] = useQueryState("perPage", parseAsInteger.withDefault(10));
+  const [sorting] = useQueryState(
+    "sort",
+    getSortingStateParser().withDefault([])
+  );
 
-  const { data, isLoading, refetch } = useDatatableRows(table, {
-    page: pageIndex + 1,
-    limit: pageSize,
-  });
+  // Translate generic-table sort/filter URL state into the backend's
+  // `sortBy` / `sortOrder` / dynamic per-field query params (see
+  // datatable.service.ts: any non-reserved key becomes an exact-match
+  // `where` filter, and `search` triggers the configured full-text search).
+  const queryParams = useMemo(() => {
+    const extra: Record<string, unknown> = {};
+
+    const [firstSort] = sorting;
+    if (firstSort) {
+      extra.sortBy = firstSort.id;
+      extra.sortOrder = firstSort.desc ? "desc" : "asc";
+    }
+
+    // Each per-column text filter (from DataTableToolbar) is stored under
+    // its own query key (the column id), so just forward any non-reserved
+    // param straight through as a dynamic filter.
+    searchParams.forEach((value, key) => {
+      if (!RESERVED_QUERY_KEYS.has(key) && value !== "") {
+        extra[key] = value;
+      }
+    });
+
+    return {
+      page,
+      limit: perPage,
+      ...extra,
+    };
+  }, [page, perPage, sorting, searchParams]);
+
+  const { data, isLoading, refetch } = useDatatableRows(table, queryParams);
   const createMutation = useCreateRow(table);
   const updateMutation = useUpdateRow(table);
   const deleteMutation = useDeleteRow(table);
@@ -41,7 +84,8 @@ export default function DataTableDetailPage() {
   const rows = (data?.data as Record<string, unknown>[] | undefined) ?? EMPTY_ROWS;
   const primaryKey = data?.meta?.primaryKey ?? "id";
   const canWrite = data?.meta?.canWrite ?? false;
-  const totalRecords = data?.meta?.total ?? 0;
+  const totalPages = data?.meta?.totalPages ?? 1;
+
 
   const handleRefresh = useCallback(() => refetch(), [refetch]);
   const handleCreate = useCallback(
@@ -57,13 +101,6 @@ export default function DataTableDetailPage() {
     (id: string) => deleteMutation.mutate(id),
     [deleteMutation]
   );
-  const handlePageChange = useCallback((newPageIndex: number) => {
-    setPageIndex(newPageIndex);
-  }, []);
-  const handlePageSizeChange = useCallback((newPageSize: number) => {
-    setPageSize(newPageSize);
-    setPageIndex(0);
-  }, []);
 
   return (
     <div className="mx-auto max-w-6xl space-y-6">
@@ -81,12 +118,13 @@ export default function DataTableDetailPage() {
         </div>
       </div>
 
-      <GenericDataTable
+      <DataTableGeneric
         table={table}
         rows={rows}
         primaryKey={primaryKey}
         canWrite={canWrite}
         isLoading={isLoading}
+        pageCount={totalPages}
         onRefresh={handleRefresh}
         onCreate={handleCreate}
         onUpdate={handleUpdate}
@@ -94,11 +132,6 @@ export default function DataTableDetailPage() {
         isSubmitting={
           createMutation.isPending || updateMutation.isPending || deleteMutation.isPending
         }
-        pageIndex={pageIndex}
-        pageSize={pageSize}
-        totalRecords={totalRecords}
-        onPageChange={handlePageChange}
-        onPageSizeChange={handlePageSizeChange}
       />
     </div>
   );

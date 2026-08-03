@@ -32,15 +32,34 @@ export function DataTableViewOptions<TData>({
   ...props
 }: DataTableViewOptionsProps<TData>) {
   const columns = React.useMemo(
-    () =>
-      table
-        .getAllColumns()
-        .filter(
-          (column) =>
-            typeof column.accessorFn !== "undefined" && column.getCanHide(),
-        ),
+    () => {
+      const allCols = table.getAllColumns();
+      // Filter columns that can be hidden - they need enableHiding: true
+      // We also check for accessorFn OR accessorKey (which auto-generates accessorFn)
+      return allCols.filter(
+        (column) => column.getCanHide()
+      );
+    },
     [table],
   );
+
+  // Debug logging
+  React.useEffect(() => {
+    const allColumns = table.getAllColumns();
+    console.log("🔍 DataTableViewOptions Debug:");
+    console.log("📊 Total columns:", allColumns.length);
+    console.log("📋 All columns:", allColumns.map(col => ({
+      id: col.id,
+      hasAccessorFn: typeof col.accessorFn !== "undefined",
+      canHide: col.getCanHide(),
+      label: col.columnDef.meta?.label ?? col.id,
+    })));
+    console.log("✅ Filterable columns (getCanHide()):", columns.length);
+    console.log("📍 Filtered columns:", columns.map(col => ({
+      id: col.id,
+      label: col.columnDef.meta?.label ?? col.id,
+    })));
+  }, [table, columns]);
 
   return (
     <Popover>
