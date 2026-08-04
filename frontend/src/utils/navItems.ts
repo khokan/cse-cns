@@ -66,6 +66,21 @@ export const AdminNavItems: NavSection[] = [
         ],
     },
     {
+        title: "Financial Management",
+        items: [
+            {
+                title: "Challans",
+                href: "/admin/dashboard/challans",
+                icon: "FileText",
+            },
+            {
+                title: "Tax to NBR",
+                href: "/admin/dashboard/tax-to-nbr",
+                icon: "BarChart",
+            },
+        ],
+    },
+    {
         title: "Operations",
         items: [
             {
@@ -83,6 +98,21 @@ export const AdminNavItems: NavSection[] = [
 ];
 
 export const TrecHolderNavItems: NavSection[] = [
+    {
+        title: "Financial",
+        items: [
+            {
+                title: "Challans",
+                href: "/dashboard/challans",
+                icon: "FileText",
+            },
+            {
+                title: "Tax to NBR",
+                href: "/dashboard/tax-to-nbr",
+                icon: "BarChart",
+            },
+        ],
+    },
     {
         title: "trecholders",
         items: [

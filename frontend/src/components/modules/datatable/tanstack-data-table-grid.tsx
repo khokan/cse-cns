@@ -189,11 +189,51 @@ export function TanstackDataTableGrid<T extends object>({
                       )}
 
                       {/* Dynamic Visible Cells */}
-                      {row.getVisibleCells().map((cell: Cell<T, unknown>) => (
-                        <TableCell key={cell.id} className={`${currentDensityStyles.cell} align-middle`}>
-                          {flexRender(cell.column.columnDef.cell, cell.getContext())}
-                        </TableCell>
-                      ))}
+                      {row.getVisibleCells().map((cell: Cell<T, unknown>) => {
+                        // Get the actual cell value from the row data
+                        const getValue = () => {
+                          const cellValue = cell.getValue();
+                          
+                          // Debug: Check what we're getting
+                          if (process.env.NODE_ENV === "development" && cell.id.includes("cseCommission")) {
+                            console.log(`[Grid Debug] Cell: ${cell.id}`, {
+                              cellValue,
+                              type: typeof cellValue,
+                              hasCustomCell: !!cell.column.columnDef.cell && typeof cell.column.columnDef.cell !== "string",
+                              stringified: String(cellValue),
+                            });
+                          }
+                          
+                          // If no custom cell renderer, just render the value
+                          if (!cell.column.columnDef.cell || 
+                              typeof cell.column.columnDef.cell === "string") {
+                            // Convert value to string safely
+                            if (cellValue === null || cellValue === undefined) {
+                              return "—";
+                            }
+                            const stringValue = String(cellValue);
+                            // Fallback if String() produces [object Object]
+                            if (stringValue === "[object Object]") {
+                              console.warn(`[Grid Warning] Cell ${cell.id} produced [object Object]:`, cellValue);
+                              // Try JSON.stringify as last resort
+                              try {
+                                return JSON.stringify(cellValue);
+                              } catch {
+                                return "—";
+                              }
+                            }
+                            return stringValue;
+                          }
+                          // Otherwise use flexRender for custom renderers
+                          return flexRender(cell.column.columnDef.cell, cell.getContext());
+                        };
+
+                        return (
+                          <TableCell key={cell.id} className={`${currentDensityStyles.cell} align-middle`}>
+                            {getValue()}
+                          </TableCell>
+                        );
+                      })}
 
                       {/* Row Actions Cell */}
                       {renderRowActions ? (
