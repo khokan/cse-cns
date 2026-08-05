@@ -4,7 +4,7 @@ import React from "react";
 import { ColumnDef } from "@tanstack/react-table";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { TanstackDataTable } from "@/components/modules/dataTable/tanstack-data-table";
+import { TanstackDataTable } from "@/components/modules/datatable/tanstack-data-table";
 import { Pencil } from "lucide-react";
 import type { ChallanItem } from "@/types/challan.types";
 import type { UserRole } from "@/utils/authUtils";

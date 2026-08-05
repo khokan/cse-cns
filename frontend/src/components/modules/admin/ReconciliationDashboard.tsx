@@ -10,12 +10,12 @@ import {
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
-import { DateFormatter } from "@/utils/tanstack-table-helpers";
 import { useReconciliationSummary } from "@/hooks/useReconciliation";
 import { cn } from "@/utils/utils";
 import { ReceivableSection } from "./reconciliation/ReceivableSection";
 import { TransactionsSection } from "./reconciliation/TransactionsSection";
 import { CashFlowSection } from "./reconciliation/CashFlowSection";
+import { DateFormatter } from "../datatable/tanstack-table-helpers";
 
 // Default settlement date — mirrors backend default (sample dataset date)
 const DEFAULT_RECONCILIATION_DATE = "2024-06-02";

@@ -3,12 +3,12 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { getAuditLogs } from "@/services/admin.service";
-import { TanstackDataTable } from "@/components/modules/dataTable/tanstack-data-table";
 import { ColumnDef } from "@tanstack/react-table";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { formatDateOnly } from "@/components/modules/dataTable/tanstack-table-helpers";
 import type { AuditLogItem } from "@/types/admin.types";
+import { formatDateOnly } from "../datatable/tanstack-table-helpers";
+import { TanstackDataTable } from "../datatable/tanstack-data-table";
 
 const columns: ColumnDef<AuditLogItem>[] = [
   {
