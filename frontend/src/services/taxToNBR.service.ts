@@ -101,7 +101,7 @@ export const bulkDeleteTaxToNBRs = async (ids: string[]): Promise<ApiResult<unkn
     console.log("[TaxToNBR Service] bulkDeleteTaxToNBRs", { ids, count: ids.length });
   }
   
-  return apiFetch(`/tax-to-nbr/bulk/delete`, {
+  return apiFetch(`/tax-to-nbr/bulk`, {
     method: "DELETE",
     body: JSON.stringify({ ids }),
   });

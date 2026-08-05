@@ -33,6 +33,13 @@ router.patch(
     TaxToNBRController.updateTaxToNBR
 );
 
+// Bulk Delete Tax to NBR records
+router.delete(
+    "/bulk",
+    checkAuth(UserRole.ADMIN, UserRole.IT),
+    TaxToNBRController.bulkDeleteTaxToNBRs
+);
+
 // Delete Tax to NBR record
 router.delete(
     "/:id",

@@ -66,10 +66,23 @@ const deleteChallan = catchAsync(async (req: Request, res: Response) => {
     });
 });
 
+const bulkDeleteChallans = catchAsync(async (req: Request, res: Response) => {
+    const { ids } = req.body;
+    const result = await ChallanService.bulkDeleteChallans(ids);
+
+    sendResponse(res, {
+        httpStatusCode: status.OK,
+        success: true,
+        message: `Successfully deleted ${result.count} challan(s).`,
+        data: result,
+    });
+});
+
 export const ChallanController = {
     getAllChallans,
     getChallanById,
     createChallan,
     updateChallan,
     deleteChallan,
+    bulkDeleteChallans,
 };

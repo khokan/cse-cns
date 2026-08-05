@@ -108,6 +108,16 @@ export function TaxToNBRDataTable({
         enableHiding: false,
       },
       {
+        accessorKey: "memberId",
+        header: "Member ID",
+        size: 120,
+        cell: ({ row }) => (
+          <Badge variant="secondary" className="font-mono text-xs">
+            {row.original.memberId || "—"}
+          </Badge>
+        ),
+      },
+      {
         accessorKey: "contractNumber",
         header: "Contract Number",
         size: 140,
@@ -187,7 +197,7 @@ export function TaxToNBRDataTable({
       data={data}
       title="Tax to NBR Records"
       description="Manage and view all tax to NBR records"
-      searchKeys={["contractNumber", "trecHolderName", "deducteeTIN", "mobileNumber"]}
+      searchKeys={["memberId", "contractNumber", "trecHolderName", "deducteeTIN", "mobileNumber"]}
       filters={[
         {
           field: "paymentDate",
@@ -207,6 +217,7 @@ export function TaxToNBRDataTable({
           ? {
               onDelete: canDelete ? onDelete : undefined,
               onExport,
+              getRowId: (row) => (row as TaxToNBRItem).id,
             }
           : undefined
       }

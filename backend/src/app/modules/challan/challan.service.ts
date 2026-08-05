@@ -65,9 +65,9 @@ const createChallan = async (dto: CreateChallanDto) => {
     const challan = await db.cns.challan.create({
         data: {
             ChallanNumber: dto.challanNumber,
-            ChallanDate: dto.challanDate,
-            ChallanPeriodStartDate: dto.challanPeriodStartDate,
-            ChallanPeriodEndDate: dto.challanPeriodEndDate,
+            ChallanDate: dto.challanDate ? new Date(dto.challanDate) : null,
+            ChallanPeriodStartDate: dto.challanPeriodStartDate ? new Date(dto.challanPeriodStartDate) : null,
+            ChallanPeriodEndDate: dto.challanPeriodEndDate ? new Date(dto.challanPeriodEndDate) : null,
             TotalTaxAmount: dto.totalTaxAmount,
         },
     });
@@ -82,9 +82,9 @@ const updateChallan = async (id: number, dto: UpdateChallanDto) => {
         where: { ID: id },
         data: {
             ...(dto.challanNumber !== undefined && { ChallanNumber: dto.challanNumber }),
-            ...(dto.challanDate !== undefined && { ChallanDate: dto.challanDate }),
-            ...(dto.challanPeriodStartDate !== undefined && { ChallanPeriodStartDate: dto.challanPeriodStartDate }),
-            ...(dto.challanPeriodEndDate !== undefined && { ChallanPeriodEndDate: dto.challanPeriodEndDate }),
+            ...(dto.challanDate !== undefined && { ChallanDate: dto.challanDate ? new Date(dto.challanDate) : null }),
+            ...(dto.challanPeriodStartDate !== undefined && { ChallanPeriodStartDate: dto.challanPeriodStartDate ? new Date(dto.challanPeriodStartDate) : null }),
+            ...(dto.challanPeriodEndDate !== undefined && { ChallanPeriodEndDate: dto.challanPeriodEndDate ? new Date(dto.challanPeriodEndDate) : null }),
             ...(dto.totalTaxAmount !== undefined && { TotalTaxAmount: dto.totalTaxAmount }),
         },
     });
@@ -102,10 +102,19 @@ const deleteChallan = async (id: number) => {
     return challan;
 };
 
+const bulkDeleteChallans = async (ids: number[]) => {
+    const result = await db.cns.challan.deleteMany({
+        where: { ID: { in: ids } },
+    });
+
+    return { count: result.count };
+};
+
 export const ChallanService = {
     getAllChallans,
     getChallanById,
     createChallan,
     updateChallan,
     deleteChallan,
+    bulkDeleteChallans,
 };

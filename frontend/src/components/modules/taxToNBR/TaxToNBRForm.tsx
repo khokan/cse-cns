@@ -1,13 +1,16 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { useMembersList } from "@/hooks/useReportJobs";
 import type { TaxToNBRItem, CreateTaxToNBRPayload, UpdateTaxToNBRPayload } from "@/types/taxToNBR.types";
 
 interface TaxToNBRFormProps {
   data?: TaxToNBRItem;
   isLoading?: boolean;
+  memberId: string;
   onSubmit: (data: CreateTaxToNBRPayload | UpdateTaxToNBRPayload) => Promise<void>;
 }
 
@@ -15,7 +18,10 @@ interface TaxToNBRFormProps {
  * Reusable TaxToNBR Form Component
  * Used in CrudDialog for both create and edit operations
  */
-export function TaxToNBRForm({ data, isLoading = false, onSubmit }: TaxToNBRFormProps) {
+export function TaxToNBRForm({ data, isLoading = false, memberId, onSubmit }: TaxToNBRFormProps) {
+  const { data: members = [], isLoading: membersLoading } = useMembersList();
+
+  const [selectedMemberId, setSelectedMemberId] = useState<string>("");
   const [formData, setFormData] = useState({
     contractNumber: "",
     trecHolderName: "",
@@ -33,10 +39,19 @@ export function TaxToNBRForm({ data, isLoading = false, onSubmit }: TaxToNBRForm
 
   const [errors, setErrors] = useState<Record<string, string>>({});
 
+  // Find member by name for edit mode
+  const matchingMember = useMemo(() => {
+    if (!data?.trecHolderName) return null;
+    return members.find((m) => m.memberName === data.trecHolderName) || null;
+  }, [data?.trecHolderName, members]);
+
   // Populate form with data when editing
   useEffect(() => {
     if (data) {
       const timeout = setTimeout(() => {
+        if (matchingMember) {
+          setSelectedMemberId(matchingMember.memberId);
+        }
         setFormData({
           contractNumber: data.contractNumber || "",
           trecHolderName: data.trecHolderName || "",
@@ -54,14 +69,26 @@ export function TaxToNBRForm({ data, isLoading = false, onSubmit }: TaxToNBRForm
       }, 0);
       return () => clearTimeout(timeout);
     }
-  }, [data]);
+  }, [data, matchingMember]);
+
+  // When a member is selected from the dropdown, auto-fill fields
+  const handleMemberSelect = (memberId: string) => {
+    setSelectedMemberId(memberId);
+    const member = members.find((m) => m.memberId === memberId);
+    if (member) {
+      setFormData((prev) => ({
+        ...prev,
+        trecHolderName: member.memberName || "",
+      }));
+    }
+  };
 
   const validateForm = (): boolean => {
     const newErrors: Record<string, string> = {};
 
-    if (!formData.contractNumber.trim()) {
-      newErrors.contractNumber = "Contract number is required";
-    }
+    // if (!formData.contractNumber.trim()) {
+    //   newErrors.contractNumber = "Contract number is required";
+    // }
 
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
@@ -74,6 +101,7 @@ export function TaxToNBRForm({ data, isLoading = false, onSubmit }: TaxToNBRForm
 
     try {
       const payload = {
+        memberId: selectedMemberId || data?.memberId || memberId,
         contractNumber: formData.contractNumber,
         trecHolderName: formData.trecHolderName || undefined,
         deducteeTIN: formData.deducteeTIN || undefined,
@@ -113,6 +141,37 @@ export function TaxToNBRForm({ data, isLoading = false, onSubmit }: TaxToNBRForm
     <form onSubmit={handleSubmit} className="space-y-4">
       <div className="grid grid-cols-2 gap-4">
         <div className="space-y-2">
+          <Label htmlFor="trecHolderName">TREC Holder Name *</Label>
+          <Select
+            value={selectedMemberId}
+            onValueChange={handleMemberSelect}
+            disabled={isLoading || membersLoading}
+          >
+            <SelectTrigger className="w-full">
+              <SelectValue placeholder={membersLoading ? "Loading members..." : "Select TREC Holder"} />
+            </SelectTrigger>
+            <SelectContent>
+              {members.map((member) => (
+                <SelectItem key={member.memberId} value={member.memberId}>
+                  [{member.memberId}] {member.memberName}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+
+        <div className="space-y-2">
+          <Label htmlFor="memberId">Member ID</Label>
+          <Input
+            id="memberId"
+            name="memberId"
+            value={selectedMemberId || data?.memberId || memberId}
+            disabled
+            className="bg-muted"
+          />
+        </div>
+
+        <div className="space-y-2">
           <Label htmlFor="contractNumber">Contract Number *</Label>
           <Input
             id="contractNumber"
@@ -134,18 +193,6 @@ export function TaxToNBRForm({ data, isLoading = false, onSubmit }: TaxToNBRForm
             name="paymentDate"
             type="date"
             value={formData.paymentDate}
-            onChange={handleChange}
-            disabled={isLoading}
-          />
-        </div>
-
-        <div className="space-y-2">
-          <Label htmlFor="trecHolderName">TREC Holder Name</Label>
-          <Input
-            id="trecHolderName"
-            name="trecHolderName"
-            placeholder="Company Name"
-            value={formData.trecHolderName}
             onChange={handleChange}
             disabled={isLoading}
           />

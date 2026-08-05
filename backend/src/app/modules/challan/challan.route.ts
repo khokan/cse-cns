@@ -33,6 +33,13 @@ router.patch(
     ChallanController.updateChallan
 );
 
+// Bulk Delete Challans
+router.delete(
+    "/bulk",
+    checkAuth(UserRole.ADMIN, UserRole.IT),
+    ChallanController.bulkDeleteChallans
+);
+
 // Delete Challan
 router.delete(
     "/:id",

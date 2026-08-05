@@ -3,7 +3,6 @@ import { TaxToNBRQuery, CreateTaxToNBRDto, UpdateTaxToNBRDto } from "./taxToNBR.
 import AppError from "../../errorHelpers/AppError.js";
 import status from "http-status";
 import { serializeBigInt } from "../../shared/serializeBigInt.js";
-import { serializeBigInt } from "../../shared/serializeBigInt.js";
 
 const getAllTaxToNBRs = async (query: TaxToNBRQuery) => {
     const page = parseInt(query.page ?? "1", 10);
@@ -66,7 +65,7 @@ const getTaxToNBRById = async (id: bigint) => {
         throw new AppError(status.NOT_FOUND, "Tax to NBR record not found.");
     }
 
-    const serialized = serializeBigInt(serializeBigInt(taxToNBR), "getTaxToNBRById");
+    const serialized = serializeBigInt(taxToNBR);
     console.log("[TaxToNBRService] getTaxToNBRById serialized data:", JSON.stringify(serialized, null, 2).substring(0, 500));
     return serialized;
 };
@@ -74,10 +73,10 @@ const getTaxToNBRById = async (id: bigint) => {
 const createTaxToNBR = async (dto: CreateTaxToNBRDto) => {
     const taxToNBR = await db.cns.taxToNBR.create({
         data: {
-            fromDate: dto.fromDate,
-            toDate: dto.toDate,
+            fromDate: dto.fromDate ? new Date(dto.fromDate) : null,
+            toDate: dto.toDate ? new Date(dto.toDate) : null,
             contractNumber: dto.contractNumber,
-            paymentDate: dto.paymentDate,
+            paymentDate: dto.paymentDate ? new Date(dto.paymentDate) : null,
             deducteeTIN: dto.deducteeTIN,
             trecHolderName: dto.trecHolderName,
             mobileNumber: dto.mobileNumber,
@@ -90,7 +89,7 @@ const createTaxToNBR = async (dto: CreateTaxToNBRDto) => {
         },
     });
 
-    const serialized = serializeBigInt(serializeBigInt(taxToNBR), "createTaxToNBR");
+    const serialized = serializeBigInt(taxToNBR);
     console.log("[TaxToNBRService] createTaxToNBR serialized data:", JSON.stringify(serialized, null, 2).substring(0, 500));
     return serialized;
 };
@@ -101,10 +100,10 @@ const updateTaxToNBR = async (id: bigint, dto: UpdateTaxToNBRDto) => {
     const taxToNBR = await db.cns.taxToNBR.update({
         where: { id },
         data: {
-            ...(dto.fromDate !== undefined && { fromDate: dto.fromDate }),
-            ...(dto.toDate !== undefined && { toDate: dto.toDate }),
+            ...(dto.fromDate !== undefined && { fromDate: dto.fromDate ? new Date(dto.fromDate) : null }),
+            ...(dto.toDate !== undefined && { toDate: dto.toDate ? new Date(dto.toDate) : null }),
             ...(dto.contractNumber !== undefined && { contractNumber: dto.contractNumber }),
-            ...(dto.paymentDate !== undefined && { paymentDate: dto.paymentDate }),
+            ...(dto.paymentDate !== undefined && { paymentDate: dto.paymentDate ? new Date(dto.paymentDate) : null }),
             ...(dto.deducteeTIN !== undefined && { deducteeTIN: dto.deducteeTIN }),
             ...(dto.trecHolderName !== undefined && { trecHolderName: dto.trecHolderName }),
             ...(dto.mobileNumber !== undefined && { mobileNumber: dto.mobileNumber }),
@@ -117,7 +116,7 @@ const updateTaxToNBR = async (id: bigint, dto: UpdateTaxToNBRDto) => {
         },
     });
 
-    const serializedUpdate = serializeBigInt(serializeBigInt(taxToNBR), "updateTaxToNBR");
+    const serializedUpdate = serializeBigInt(taxToNBR);
     console.log("[TaxToNBRService] updateTaxToNBR serialized data:", JSON.stringify(serializedUpdate, null, 2).substring(0, 500));
     return serializedUpdate;
 };
@@ -129,9 +128,16 @@ const deleteTaxToNBR = async (id: bigint) => {
         where: { id },
     });
 
-    const serializedDelete = serializeBigInt(serializeBigInt(taxToNBR), "deleteTaxToNBR");
+    const serializedDelete = serializeBigInt(taxToNBR);
     console.log("[TaxToNBRService] deleteTaxToNBR serialized data:", JSON.stringify(serializedDelete, null, 2).substring(0, 500));
     return serializedDelete;
+};
+
+const bulkDeleteTaxToNBRs = async (ids: bigint[]) => {
+    const result = await db.cns.taxToNBR.deleteMany({
+        where: { id: { in: ids } },
+    });
+    return { count: result.count };
 };
 
 export const TaxToNBRService = {
@@ -140,4 +146,5 @@ export const TaxToNBRService = {
     createTaxToNBR,
     updateTaxToNBR,
     deleteTaxToNBR,
+    bulkDeleteTaxToNBRs,
 };

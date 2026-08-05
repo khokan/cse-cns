@@ -128,6 +128,7 @@ export function ChallanDataTable({
           ? {
               onDelete: canDelete ? onDelete : undefined,
               onExport,
+              getRowId: (row) => String((row as ChallanItem).ID),
             }
           : undefined
       }

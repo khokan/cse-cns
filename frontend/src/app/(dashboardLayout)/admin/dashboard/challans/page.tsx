@@ -48,26 +48,30 @@ export default function AdminChallansPage() {
   }, []);
 
   const handleCreateSubmit = useCallback(async (payload: CreateChallanPayload) => {
-    return new Promise<void>((resolve) => {
+    return new Promise<void>((resolve, reject) => {
       createChallan(payload, {
         onSuccess: () => {
           handleCloseDialog();
           resolve();
         },
-        onError: () => resolve(),
+        onError: (error) => {
+          reject(error);
+        },
       });
     });
   }, [createChallan, handleCloseDialog]);
 
   const handleEditSubmit = useCallback(async (payload: UpdateChallanPayload) => {
-    return new Promise<void>((resolve) => {
+    return new Promise<void>((resolve, reject) => {
       if (selectedChallan) {
         updateChallan(payload, {
           onSuccess: () => {
             handleCloseDialog();
             resolve();
           },
-          onError: () => resolve(),
+          onError: (error) => {
+            reject(error);
+          },
         });
       }
     });
@@ -75,7 +79,7 @@ export default function AdminChallansPage() {
 
   const handleDelete = useCallback(
     (ids: string[]): Promise<void> => {
-      return new Promise((resolve) => {
+      return new Promise((resolve, reject) => {
         if (!ids.length) {
           resolve();
           return;
@@ -83,12 +87,12 @@ export default function AdminChallansPage() {
         if (ids.length === 1) {
           deleteChallan(Number(ids[0]), {
             onSuccess: () => resolve(),
-            onError: () => resolve(),
+            onError: (error) => reject(error),
           });
         } else {
           bulkDeleteChallans(ids, {
             onSuccess: () => resolve(),
-            onError: () => resolve(),
+            onError: (error) => reject(error),
           });
         }
       });
@@ -96,9 +100,10 @@ export default function AdminChallansPage() {
     [deleteChallan, bulkDeleteChallans]
   );
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
     if (formRef.current) {
-      formRef.current.dispatchEvent(new Event("submit", { bubbles: true }));
+      const event = new Event("submit", { bubbles: true, cancelable: true });
+      formRef.current.dispatchEvent(event);
     }
   };
 
@@ -203,17 +208,22 @@ const ChallanFormWrapper = React.forwardRef<
     onSubmit: (data: CreateChallanPayload | UpdateChallanPayload) => Promise<void>;
   }
 >(({ data, isLoading, onSubmit }, ref) => {
+  const localFormRef = useRef<HTMLDivElement>(null);
+
+  // Create a wrapper form and expose it via ref
+  React.useImperativeHandle(ref, () => {
+    const form = localFormRef.current?.querySelector('form') as HTMLFormElement;
+    return form || ({} as HTMLFormElement);
+  }, []);
+
   return (
-    <form ref={ref} onSubmit={(e) => {
-      e.preventDefault();
-      // Form submission will be handled by ChallanForm
-    }}>
+    <div ref={localFormRef}>
       <ChallanForm
         data={data}
         isLoading={isLoading}
         onSubmit={onSubmit}
       />
-    </form>
+    </div>
   );
 });
 

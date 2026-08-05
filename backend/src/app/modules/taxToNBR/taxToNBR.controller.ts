@@ -82,10 +82,23 @@ const deleteTaxToNBR = catchAsync(async (req: Request, res: Response) => {
     });
 });
 
+const bulkDeleteTaxToNBRs = catchAsync(async (req: Request, res: Response) => {
+    const { ids } = req.body;
+    const result = await TaxToNBRService.bulkDeleteTaxToNBRs(ids.map((id: string) => BigInt(id)));
+
+    sendResponse(res, {
+        httpStatusCode: status.OK,
+        success: true,
+        message: `Successfully deleted ${result.count} record(s).`,
+        data: result,
+    });
+});
+
 export const TaxToNBRController = {
     getAllTaxToNBRs,
     getTaxToNBRById,
     createTaxToNBR,
     updateTaxToNBR,
     deleteTaxToNBR,
+    bulkDeleteTaxToNBRs,
 };

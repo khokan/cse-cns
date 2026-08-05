@@ -49,9 +49,9 @@ export const deleteChallan = async (
 };
 
 export const bulkDeleteChallans = async (ids: string[]): Promise<ApiResult<unknown>> => {
-  return apiFetch(`/challans/bulk/delete`, {
+  return apiFetch(`/challans/bulk`, {
     method: "DELETE",
-    body: JSON.stringify({ ids }),
+    body: JSON.stringify({ ids: ids.map(Number) }),
   });
 };
 

@@ -48,26 +48,30 @@ export default function AdminTaxToNBRPage() {
   }, []);
 
   const handleCreateSubmit = useCallback(async (payload: CreateTaxToNBRPayload) => {
-    return new Promise<void>((resolve) => {
+    return new Promise<void>((resolve, reject) => {
       createTaxToNBR(payload, {
         onSuccess: () => {
           handleCloseDialog();
           resolve();
         },
-        onError: () => resolve(),
+        onError: (error) => {
+          reject(error);
+        },
       });
     });
   }, [createTaxToNBR, handleCloseDialog]);
 
   const handleEditSubmit = useCallback(async (payload: UpdateTaxToNBRPayload) => {
-    return new Promise<void>((resolve) => {
+    return new Promise<void>((resolve, reject) => {
       if (selectedRecord) {
         updateTaxToNBR(payload, {
           onSuccess: () => {
             handleCloseDialog();
             resolve();
           },
-          onError: () => resolve(),
+          onError: (error) => {
+            reject(error);
+          },
         });
       }
     });
@@ -75,7 +79,7 @@ export default function AdminTaxToNBRPage() {
 
   const handleDelete = useCallback(
     (ids: string[]): Promise<void> => {
-      return new Promise((resolve) => {
+      return new Promise((resolve, reject) => {
         if (!ids.length) {
           resolve();
           return;
@@ -83,12 +87,12 @@ export default function AdminTaxToNBRPage() {
         if (ids.length === 1) {
           deleteTaxToNBR(ids[0], {
             onSuccess: () => resolve(),
-            onError: () => resolve(),
+            onError: (error) => reject(error),
           });
         } else {
           bulkDeleteTaxToNBRs(ids, {
             onSuccess: () => resolve(),
-            onError: () => resolve(),
+            onError: (error) => reject(error),
           });
         }
       });
@@ -96,9 +100,10 @@ export default function AdminTaxToNBRPage() {
     [deleteTaxToNBR, bulkDeleteTaxToNBRs]
   );
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
     if (formRef.current) {
-      formRef.current.dispatchEvent(new Event("submit", { bubbles: true }));
+      const event = new Event("submit", { bubbles: true, cancelable: true });
+      formRef.current.dispatchEvent(event);
     }
   };
 
@@ -181,6 +186,7 @@ export default function AdminTaxToNBRPage() {
           ref={formRef}
           data={selectedRecord || undefined}
           isLoading={isCreating || isUpdating}
+          memberId={user?.id || ""}
           onSubmit={async (payload: CreateTaxToNBRPayload | UpdateTaxToNBRPayload) => {
             if (dialogMode === "create") {
               return handleCreateSubmit(payload as CreateTaxToNBRPayload);
@@ -200,20 +206,27 @@ const TaxToNBRFormWrapper = React.forwardRef<
   {
     data?: TaxToNBRItem;
     isLoading?: boolean;
+    memberId: string;
     onSubmit: (data: CreateTaxToNBRPayload | UpdateTaxToNBRPayload) => Promise<void>;
   }
->(({ data, isLoading, onSubmit }, ref) => {
+>(({ data, isLoading, memberId, onSubmit }, ref) => {
+  const localFormRef = useRef<HTMLDivElement>(null);
+
+  // Create a wrapper form and expose it via ref
+  React.useImperativeHandle(ref, () => {
+    const form = localFormRef.current?.querySelector('form') as HTMLFormElement;
+    return form || ({} as HTMLFormElement);
+  }, []);
+
   return (
-    <form ref={ref} onSubmit={(e) => {
-      e.preventDefault();
-      // Form submission will be handled by TaxToNBRForm
-    }}>
+    <div ref={localFormRef}>
       <TaxToNBRForm
         data={data}
         isLoading={isLoading}
+        memberId={memberId}
         onSubmit={onSubmit}
       />
-    </form>
+    </div>
   );
 });
 
