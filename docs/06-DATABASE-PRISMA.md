@@ -17,8 +17,8 @@ Files: `schema.prisma`, `challan.prisma`, `settlement.prisma`, `taxToNBR.prisma`
 
 Key models:
 - **`Settlement`** — Trade settlement records (`TradeDate`, `ContractNumber` PK, buy/sell broker & trader codes, quantity, price, process type). Maps to legacy CNS trading data.
-- **`Challan`** — Bank challan records related to tax remittance.
-- **`TaxToNBR`** — Tax collection/remittance records sent to the National Board of Revenue (NBR), used by the tax certificate report.
+- **`Challan`** — Bank challan records related to tax remittance (dates: `ChallanDate`, `ChallanPeriodStartDate`, `ChallanPeriodEndDate`). **[NEW]** Backend services now properly convert date strings to Date objects.
+- **`TaxToNBR`** — Tax collection/remittance records sent to the National Board of Revenue (NBR), used by the tax certificate report (dates: `paymentDate`, `fromDate`, `toDate`). **[NEW]** Backend services now properly convert date strings to Date objects.
 
 This database is largely **read-heavy** and queried via raw SQL (`$queryRawUnsafe`) for reconciliation summaries and report builders (stored-procedure-like aggregation queries), since it maps to an existing legacy schema.
 

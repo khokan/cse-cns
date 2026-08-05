@@ -5,6 +5,28 @@ Base path is mounted at the Express app root (e.g. `/api/v1`) via `routes/index.
 ## Auth — `/auth` (`modules/auth`)
 Wraps better-auth session/credential flows plus custom endpoints (registration, role/status checks). Uses `emailAndPassword`, Google OAuth (`socialProviders`), and Email OTP verification. Session cookie/bearer token issued by better-auth; see Auth document for details.
 
+## Challan — `/challan` (`modules/challan`) **[NEW]**
+| Method | Path | Description |
+|---|---|---|
+| GET | `/challan` | List all challans (paginated, searchable, filterable by date range) |
+| GET | `/challan/:id` | Get a specific challan record |
+| POST | `/challan` | Create a new challan (validates date formats, converts to Date objects) |
+| PATCH | `/challan/:id` | Update a challan record (partial updates supported) |
+| DELETE | `/challan/:id` | Delete a challan record |
+
+Handles date field conversion from ISO date strings to proper DateTime objects before database operations.
+
+## Tax-to-NBR — `/tax-to-nbr` (`modules/taxToNBR`) **[NEW]**
+| Method | Path | Description |
+|---|---|---|
+| GET | `/tax-to-nbr` | List all tax-to-NBR records (paginated, searchable by contract/TIN/email, filterable by date) |
+| GET | `/tax-to-nbr/:id` | Get a specific tax-to-NBR record |
+| POST | `/tax-to-nbr` | Create a new tax-to-NBR record (validates dates, converts to Date objects) |
+| PATCH | `/tax-to-nbr/:id` | Update a tax-to-NBR record (partial updates supported) |
+| DELETE | `/tax-to-nbr/:id` | Delete a tax-to-NBR record |
+
+Handles multiple date fields (`fromDate`, `toDate`, `paymentDate`) with automatic string-to-Date conversion for Prisma compatibility.
+
 ## Reports — `/reports` (`modules/reports`)
 | Method | Path | Description |
 |---|---|---|

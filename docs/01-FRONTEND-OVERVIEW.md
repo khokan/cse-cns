@@ -35,6 +35,8 @@ zod/             Zod validation schemas
 ## Key Hooks
 | Hook | Purpose |
 |---|---|
+| `useChallan.ts` | **[NEW]** CRUD queries/mutations for Challan module with proper Promise-based callbacks |
+| `useTaxToNBR.ts` | **[NEW]** CRUD queries/mutations for Tax-to-NBR module with proper Promise-based callbacks |
 | `useDatatable.ts` | CRUD queries/mutations for the generic datatable module (TanStack Query) |
 | `useBulkActions.ts` | Bulk operations against admin/data endpoints |
 | `useReconciliation.ts` | Reconciliation dashboard data fetching |
@@ -45,9 +47,9 @@ zod/             Zod validation schemas
 
 ## Services Layer
 `src/services/*.service.ts` wraps `lib/api-client.ts` (a typed fetch/axios wrapper) for:
-- `admin.service.ts`, `bulk-operations.service.ts`, `datatable.service.ts`, `reconciliation.service.ts`, `report.service.ts`, `settlement.service.ts`, `trecholder.service.ts`, `user.service.ts`
+- `admin.service.ts`, `bulk-operations.service.ts`, `challan.service.ts`, `datatable.service.ts`, `reconciliation.service.ts`, `report.service.ts`, `settlement.service.ts`, `taxToNBR.service.ts`, `trecholder.service.ts`, `user.service.ts`
 
-Each service returns a consistent `{ data, error }` shape consumed by hooks, decoupling UI components from raw fetch/axios calls.
+Each service returns a consistent `{ data, error }` shape consumed by hooks, decoupling UI components from raw fetch/axios calls. **[NEW]** `challan.service.ts` and `taxToNBR.service.ts` provide typed endpoints for CRUD operations on these modules.
 
 ## Auth Client
 `lib/auth-client.ts` creates a `better-auth/react` client with `credentials: "include"` so session cookies flow with cross-origin requests. `signOutUser()` calls `authClient.signOut()` then hits a Next.js route (`/api/ui/logout`) as a fallback to guarantee cookies are cleared server-side.
@@ -55,11 +57,14 @@ Each service returns a consistent `{ data, error }` shape consumed by hooks, dec
 ## Feature Modules (`components/modules`)
 - `admin/`, `admin-dashboard/` — admin management screens
 - `Auth/`, `login/` — authentication UI
+- `challan/` — **[NEW]** Challan management with CrudDialog, form validation, and bulk operations
+- `taxToNBR/` — **[NEW]** Tax-to-NBR record management with full CRUD and edit page
 - `datatable/` — generic CRUD table (see dedicated Generic Table document)
 - `reports/` — report generation UI (see Report Engine document)
 - `settlement/` — settlement dashboards
-- `reconciliation` — surfaced through hooks/services, dashboards under `dashboard/`/`Dashboord/`
+- `reconciliation` — surfaced through hooks/services, dashboards under `dashboard/`/`Borad/`
 - `common/`, `home/` — shared/landing components
+- `shared/` — Reusable components like `CrudDialog` for consistent form workflows
 
 ## Build & Config
 - `next.config.ts`, `postcss.config.mjs`, `eslint.config.mjs`, `tsconfig.json`

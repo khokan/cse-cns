@@ -37,9 +37,11 @@ CONFIG REWRITE
 REDIS_URL=redis://:yourPassword@192.168.105.44:6379
 -----------------
 
-version 1.0 [29/06/2026]
+version 1.0 [29/07/2026]
 Report generated from built in memory of the system. No external data was used to generate this report.
-version 2.0 [02/07/2026]
+version 2.0 [02/08/2026]
 Report generated socket,redis,bullmq,cutom control
-version 3.0 [03/07/2026]
+version 3.0 [03/08/2026]
 TableCn table control added for custom dataTable re-organized
+version 2.0 [05/08/2026][updated]
+custom table updated, challan, taxToNBR CRUD implemented

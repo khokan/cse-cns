@@ -23,11 +23,18 @@ _Consolidated from: `docs/CHECKLIST_STATUS.md`, `docs/COMPLETION_CHECKLIST.md`, 
 - Dual Prisma setup: `cns` (SQL Server, legacy trading data) and `cnsweb` (PostgreSQL, application data), merged under a single `db` accessor.
 - Migrations tracked for the `cnsweb` schema; `cns` treated as an existing/introspected legacy database.
 - Raw SQL query paths implemented for reconciliation summaries and tax-certificate source data.
+- **[NEW]** Fixed Prisma DateTime validation: backend services now properly convert date strings to Date objects before database operations.
 
 ### Generic Data Table
 - Registry-driven generic CRUD (`datatable.registry.ts` + `datatable.service.ts`) supporting arbitrary Prisma models across both databases with role-gated read/write.
 - TanStack Table-based `GenericDataTable` component with dynamic column derivation, date formatting, and a generic create/edit dialog (`RowCreateEditDialog`).
 - TanStack Query hooks (`useDatatable.ts`) for rows/tables CRUD with cache invalidation and toast feedback.
+
+### CRUD Module Forms
+- **[NEW]** Challan module: Full CRUD with `ChallanForm` component, `CrudDialog` wrapper, and `useImperativeHandle` for proper form ref handling.
+- **[NEW]** Tax-to-NBR module: Full CRUD with `TaxToNBRForm` component, edit page with form integration, and consistent dialog pattern.
+- **[NEW]** Fixed form submission event triggering: Implemented `useImperativeHandle` to properly expose inner form elements via ref, enabling button-triggered form submission.
+- **[NEW]** Enhanced error handling: Promise-based mutation callbacks with proper rejection for error propagation.
 
 ### Report Generation Engine
 - BullMQ queues for reports and settlements, backed by a dedicated Redis connection with retry/backoff policies.
@@ -39,6 +46,8 @@ _Consolidated from: `docs/CHECKLIST_STATUS.md`, `docs/COMPLETION_CHECKLIST.md`, 
 - Form validation (Zod schemas + inline `FormError` components) on login/register.
 - Loading states (`data-loader.tsx`), empty states (`empty-state.tsx`), and confirmation dialogs (`confirm-dialog.tsx`) implemented across data-heavy screens.
 - shadcn/ui-based design system (`components/ui`) for consistent styling.
+- **[NEW]** Improved form submission UX: Forms now properly respond to button clicks with visual feedback (loading states, disabled buttons during submission).
+- **[NEW]** CrudDialog pattern: Reusable component for create/edit/view operations across modules with consistent behavior.
 
 ## 🟡 Partially Complete / In Progress
 - Broader UI polish rollout (loading/empty states) across all remaining feature modules beyond the initial high-priority screens.

@@ -35,7 +35,7 @@ Each feature module under `modules/<name>` follows a consistent structure:
 - `*.service.ts` — Business logic, Prisma queries, raw SQL calls to stored procedures
 - `*.interface.ts` — TypeScript types/DTOs for the module
 
-Modules: `admin`, `auth`, `datatable` (generic CRUD registry), `reconciliation`, `reports` (with a `builders/` subfolder for CSV/XLSX/PDF generation), `settlement`.
+Modules: `admin`, `auth`, `challan` (**[NEW]** Full CRUD with date conversion and form validation), `datatable` (generic CRUD registry), `reconciliation`, `reports` (with a `builders/` subfolder for CSV/XLSX/PDF generation), `settlement`, `taxToNBR` (**[NEW]** Full CRUD for tax-to-NBR records with proper DateTime handling).
 
 ## Cross-Cutting Middleware
 - `checkAuth.ts` — validates session via `better-auth`'s `auth.api.getSession()`, attaches `req.user`, enforces role-based access
@@ -50,6 +50,8 @@ Modules: `admin`, `auth`, `datatable` (generic CRUD registry), `reconciliation`,
 - `sentry.ts` — Sentry init/capture wrapper
 - `socket.ts` — Socket.IO server setup, `emitToUser()` for targeted realtime events
 - `storage.ts` — file read/write/stream helpers for generated reports
+
+**[NEW]** Date Conversion Best Practice: Services handling date inputs (e.g., `challan.service.ts`, `taxToNBR.service.ts`) now convert date strings to proper Date objects before passing to Prisma to avoid DateTime validation errors. Pattern: `dto.fieldDate ? new Date(dto.fieldDate) : null`
 
 ## Request Flow
 `server.ts` → `app.ts` (Express app, global middleware, correlationId, logger) → `routes/index.ts` mounts:
