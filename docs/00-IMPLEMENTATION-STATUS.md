@@ -49,6 +49,21 @@ _Consolidated from: `docs/CHECKLIST_STATUS.md`, `docs/COMPLETION_CHECKLIST.md`, 
 - **[NEW]** Improved form submission UX: Forms now properly respond to button clicks with visual feedback (loading states, disabled buttons during submission).
 - **[NEW]** CrudDialog pattern: Reusable component for create/edit/view operations across modules with consistent behavior.
 
+### RBAC + Policy Engine
+- **[NEW]** Full-stack dynamic RBAC system replacing legacy hardcoded `rolePermissions.ts`.
+- Database models: `Role`, `Permission`, `RolePermission`, `UserRole`, `Policy` in `cnsweb` schema.
+- `permissionResolver.ts`: Resolves permissions from both `UserRole` join table and `User.role` string column; applies per-user `Policy` DENY/ALLOW overrides; Redis-cached with 5-min TTL.
+- `requirePermission(module, action)` Express middleware — additive, applied per-route as needed.
+- `SecurityService` + `SecurityController` + `SecurityRoutes` for full CRUD over roles, permissions, user-role assignments, and user policies.
+- `GET /security/my-permissions` endpoint — returns logged-in user's resolved permission map; accessible by any authenticated user.
+- `useMyPermissions()` React Query hook — fetches live permissions on mount and window focus (`staleTime: 0`).
+- Admin Security UI at `/admin/security/`: Security Hub, Roles list, Role detail with permission matrix (Module × Action checkbox grid), Permission catalog, User security page (role assignment + policy overrides).
+- Cache invalidated on role/policy change: covers both `UserRole`-assigned users and users matched via `User.role` string column.
+- `seed.ts` updated to auto-seed default roles and canonical permissions on startup.
+- Deprecated `src/utils/rolePermissions.ts` (legacy hardcoded helper); `ChallanDataTable` and `TaxToNBRDataTable` refactored to use `useMyPermissions()`.
+- **Reference**: [09-RBAC-IMPLEMENTATION.md](./09-RBAC-IMPLEMENTATION.md)
+
+
 ## 🟡 Partially Complete / In Progress
 - Broader UI polish rollout (loading/empty states) across all remaining feature modules beyond the initial high-priority screens.
 - Production hardening for Winston (daily-rotate-file transport, log retention policy) referenced in the roadmap but not fully finalized.

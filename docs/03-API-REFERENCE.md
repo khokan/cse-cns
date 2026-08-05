@@ -52,7 +52,49 @@ Manages settlement report/job creation and status, backed by `settlement.queue.t
 
 Driven by `datatable.registry.ts`, which maps table keys to Prisma db/model, primary key, `readRoles`/`writeRoles`, `idType`, and searchable fields — enabling one generic controller/service to serve many tables.
 
+## Security (RBAC) — `/security` (`modules/security`) **[NEW]**
+
+All routes require `checkAuth(UserRole.ADMIN)` except `/my-permissions`.
+
+**Roles:**
+| Method | Path | Description |
+|---|---|---|
+| GET | `/security/roles` | List all roles |
+| POST | `/security/roles` | Create a new role |
+| GET | `/security/roles/:id` | Get role detail |
+| PATCH | `/security/roles/:id` | Update role label/description |
+| DELETE | `/security/roles/:id` | Delete a non-system role |
+| GET | `/security/roles/:id/permissions` | Get role's full permission matrix |
+| PUT | `/security/roles/:id/permissions` | Bulk-replace role permissions (invalidates Redis cache for all affected users) |
+
+**Permissions:**
+| Method | Path | Description |
+|---|---|---|
+| GET | `/security/permissions` | List all permissions, grouped by module |
+| POST | `/security/permissions` | Create a new permission |
+
+**User Roles & Policies:**
+| Method | Path | Description |
+|---|---|---|
+| GET | `/security/users/:userId/roles` | Get roles assigned to a user |
+| PUT | `/security/users/:userId/roles` | Assign/revoke roles for a user |
+| GET | `/security/users/:userId/policies` | Get per-user policy overrides |
+| PUT | `/security/users/:userId/policies` | Set per-user ALLOW/DENY policy overrides |
+
+**Self:**
+| Method | Path | Auth | Description |
+|---|---|---|---|
+| GET | `/security/my-permissions` | Any authed user | Returns resolved permission map `{ "module:action": "ALLOW"\|"DENY" }` |
+
+**Seed:**
+| Method | Path | Description |
+|---|---|---|
+| POST | `/security/seed` | Re-seed default roles and permissions |
+
+See [09-RBAC-IMPLEMENTATION.md](./09-RBAC-IMPLEMENTATION.md) for full architecture details.
+
 ## Admin — `/admin` (`modules/admin`)
+
 User management, bulk operations, and administrative actions (role changes, activation/deactivation, audit-log-triggering operations).
 
 ## Reconciliation — `/reconciliation` (`modules/reconciliation`)

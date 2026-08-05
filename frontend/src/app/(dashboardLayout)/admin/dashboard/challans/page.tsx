@@ -11,9 +11,16 @@ import { Plus } from "lucide-react";
 import type { ChallanItem, CreateChallanPayload, UpdateChallanPayload } from "@/types/challan.types";
 import { useUser } from "@/hooks/useUser";
 
+import { useMyPermissions } from "@/hooks/useMyPermissions";
+
 export default function AdminChallansPage() {
   const { user } = useUser();
   const userRole = user?.role || null;
+  const { canCreate, canUpdate, canDelete } = useMyPermissions();
+  const canCreateChallan = canCreate("challan");
+  const canUpdateChallan = canUpdate("challan");
+  const canDeleteChallan = canDelete("challan");
+
   const [pageIndex, setPageIndex] = useState(0);
   const [pageSize, setPageSize] = useState(10);
 
@@ -118,8 +125,8 @@ export default function AdminChallansPage() {
   return (
     <ProtectedPage
       userRole={userRole}
-      allowedRoles={["ADMIN", "TRECHOLDER"]}
-      fallbackMessage="Only Admin and TrecHolders can access challans"
+      allowedRoles={["ADMIN", "IT", "ACCOUNTING", "TRECHOLDER"]}
+      fallbackMessage="You don't have permission to access Challans"
     >
       <div className="mx-auto max-w-7xl space-y-6 p-4 md:p-6">
         <div className="flex items-center justify-between">
@@ -129,7 +136,7 @@ export default function AdminChallansPage() {
               View, create, and manage all challans in the system.
             </p>
           </div>
-          {userRole === "ADMIN" && (
+          {canCreateChallan && (
             <Button onClick={() => handleOpenDialog("create")} className="gap-2" disabled={isLoading}>
               <Plus className="h-4 w-4" />
               Create Challan
@@ -149,15 +156,17 @@ export default function AdminChallansPage() {
           data={challansData?.data || []}
           isLoading={isLoading}
           userRole={userRole}
-          onEdit={userRole === "ADMIN" ? (challan) => handleOpenDialog("edit", challan) : undefined}
-          onDelete={userRole === "ADMIN" ? handleDelete : undefined}
+          onEdit={canUpdateChallan ? (challan) => handleOpenDialog("edit", challan) : undefined}
+          onDelete={canDeleteChallan ? handleDelete : undefined}
           pageIndex={pageIndex}
           pageSize={pageSize}
           totalRecords={challansData?.meta?.total || 0}
           onPageChange={setPageIndex}
           onPageSizeChange={setPageSize}
         />
+
       </div>
+
 
       {/* CRUD Dialog */}
       <CrudDialog

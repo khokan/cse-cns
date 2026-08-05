@@ -1,745 +1,355 @@
-# Role-Based Access Control (RBAC) - Implementation Guide
+# Role-Based Access Control (RBAC) — Full-Stack Implementation
+
+> **Version**: 2.0 — Dynamic RBAC + Policy Engine  
+> **Supersedes**: Legacy hardcoded `rolePermissions.ts` approach  
+> **Status**: ✅ Implemented
+
+---
 
 ## Overview
-Role-based access control has been implemented for Challan and TaxToNBR modules. Only **ADMIN** and **TRECHOLDER** roles can perform CRUD operations.
 
-## Files Created/Modified
+The system uses a **database-driven, policy-aware RBAC engine** where:
 
-### 1. **Authorization Utilities**
+- Admins manage Roles, Permissions, and per-user Policy overrides through an Admin UI — **no code changes required**.
+- Permissions are resolved at runtime from the database and cached in Redis.
+- Frontend UI controls (buttons, actions) are gated by a live `GET /security/my-permissions` API call.
 
-#### `src/utils/rolePermissions.ts`
-Core permission checking functions:
+---
+
+## Architecture
+
+### Permission Resolution Chain
+
+```
+HTTP Request
+  ↓
+checkAuth(...allowedRoles)        — JWT/session validation, attaches req.user
+  ↓
+requirePermission(module, action) — optional fine-grained check
+  ↓
+permissionResolver.ts
+  ├─ 1a. Load UserRole join table  (userId → Role → RolePermission → Permission)
+  ├─ 1b. Fallback: Load User.role string (e.g. "TRECHOLDER" → Role lookup)
+  ├─ 2.  Load Policy overrides     (per-user ALLOW/DENY)
+  ├─ 3.  Merge: DENY always overrides ALLOW
+  └─ 4.  Cache in Redis (TTL: 5 min, invalidated on role/policy change)
+  ↓
+Controller → Database
+```
+
+### Database Schema
+
+```
+┌──────────┐     ┌──────────────────┐     ┌────────────┐
+│   Role   │────▶│  RolePermission  │◀────│ Permission │
+└──────────┘     └──────────────────┘     └────────────┘
+     ▲                                          ▲
+     │                                          │
+┌──────────┐     ┌──────────────┐     ┌─────────────────┐
+│   User   │────▶│   UserRole   │     │     Policy      │
+│(role str)│     └──────────────┘     │(ALLOW/DENY ovr) │
+└──────────┘                          └─────────────────┘
+```
+
+**Models** (in `backend/prisma/cnsweb/auth.prisma`):
+
+| Model | Purpose |
+|-------|---------|
+| `Role` | Named group of permissions (`ADMIN`, `TRECHOLDER`, `ACCOUNTING`, `IT`, `MARKETING`) |
+| `Permission` | Atomic action: `module` + `action` (e.g. `challan:create`) |
+| `RolePermission` | Join table: which permissions belong to which role |
+| `UserRole` | Join table: explicit role assignments for a user (supplementary) |
+| `Policy` | Per-user ALLOW/DENY override, supersedes role-level permissions |
+
+---
+
+## Backend Implementation
+
+### Files
+
+| File | Purpose |
+|------|---------|
+| `src/app/utils/permissionResolver.ts` | Core resolution logic + Redis cache |
+| `src/app/middleware/requirePermission.ts` | Express middleware (additive, optional per-route) |
+| `src/app/middleware/checkAuth.ts` | Existing JWT/session middleware (unchanged) |
+| `src/app/modules/security/security.service.ts` | CRUD for roles, permissions, user roles, policies |
+| `src/app/modules/security/security.controller.ts` | HTTP handlers |
+| `src/app/modules/security/security.route.ts` | Routes — all ADMIN-only except `/my-permissions` |
+| `src/app/types/security.types.ts` | Shared enums, DTOs, defaults |
+| `src/app/utils/seed.ts` | Seeds default roles & permissions on startup |
+
+### Permission Resolution (`permissionResolver.ts`)
 
 ```typescript
-// Check if user can perform CRUD operations
-canPerformCRUD(userRole)                  // ✓ ADMIN, TRECHOLDER
-canAccessChallanCRUD(userRole)            // ✓ ADMIN, TRECHOLDER
-canAccessTaxToNBRCRUD(userRole)           // ✓ ADMIN, TRECHOLDER
-
-// Specific operations (Create/Update/Delete)
-canCreateChallan(userRole)                // ✓ ADMIN only
-canUpdateChallan(userRole)                // ✓ ADMIN only
-canDeleteChallan(userRole)                // ✓ ADMIN only
-
-canCreateTaxToNBR(userRole)               // ✓ ADMIN only
-canUpdateTaxToNBR(userRole)               // ✓ ADMIN only
-canDeleteTaxToNBR(userRole)               // ✓ ADMIN only
-
-// Utility functions
-canViewAllRecords(userRole)               // ✓ ADMIN only
-getRecordFilter(userRole, userId)         // Returns filter based on role
-getAllowedRolesForChallan()               // Returns ["ADMIN", "TRECHOLDER"]
-getAllowedRolesForTaxToNBR()              // Returns ["ADMIN", "TRECHOLDER"]
+// Two-source role resolution:
+// 1a. UserRole join table (explicit assignments)
+// 1b. User.role string column (e.g. "TRECHOLDER" → looks up Role by name)
+// Both sources are merged; Policy DENY always wins
+async function loadUserPermissions(userId: string): Promise<CachedPermissions>
 ```
 
-### 2. **Navigation Items**
+**Cache key**: `perm:{userId}` — invalidated whenever:
+- `updateRolePermissions` is called (invalidates all users with that role, by both `UserRole` and `User.role`)
+- `updateUserRoles` is called (invalidates that user)
+- `updateUserPolicies` is called (invalidates that user)
 
-#### `src/utils/navItems.ts` (Updated)
-Added Challan and TaxToNBR menu items:
+### Middleware Usage
 
-**Admin Navigation:**
+```typescript
+import { checkAuth } from "../../middleware/checkAuth.js";
+import { requirePermission } from "../../middleware/requirePermission.js";
+import { UserRole } from "../../types/auth.types.js";
+
+// Coarse-grained: role check only (existing pattern — unchanged)
+router.get("/", checkAuth(UserRole.ADMIN, UserRole.TRECHOLDER), Controller.getAll);
+
+// Fine-grained: role + permission check
+router.post("/", checkAuth(UserRole.ADMIN), requirePermission("challan", "create"), Controller.create);
 ```
-Financial Management
-├── Challans (/admin/dashboard/challans)
-└── Tax to NBR (/admin/dashboard/tax-to-nbr)
+
+### Security API Endpoints
+
+| Method | Route | Auth | Description |
+|--------|-------|------|-------------|
+| `GET` | `/security/roles` | ADMIN | List all roles |
+| `POST` | `/security/roles` | ADMIN | Create role |
+| `GET` | `/security/roles/:id` | ADMIN | Get role detail |
+| `PATCH` | `/security/roles/:id` | ADMIN | Update role label/description |
+| `DELETE` | `/security/roles/:id` | ADMIN | Delete non-system role |
+| `GET` | `/security/roles/:id/permissions` | ADMIN | Get role's permission matrix |
+| `PUT` | `/security/roles/:id/permissions` | ADMIN | Bulk-replace role permissions |
+| `GET` | `/security/permissions` | ADMIN | List all permissions (grouped by module) |
+| `POST` | `/security/permissions` | ADMIN | Create permission |
+| `GET` | `/security/users/:userId/roles` | ADMIN | Get user's assigned roles |
+| `PUT` | `/security/users/:userId/roles` | ADMIN | Assign/revoke user roles |
+| `GET` | `/security/users/:userId/policies` | ADMIN | Get user's policy overrides |
+| `PUT` | `/security/users/:userId/policies` | ADMIN | Set user policy overrides |
+| `GET` | `/security/my-permissions` | Any authed user | Get own resolved permission map |
+| `POST` | `/security/seed` | ADMIN | Re-seed default roles & permissions |
+
+### Default Permissions (seeded on startup)
+
+Modules seeded: `challan`, `taxToNBR`, `report`, `settlement`, `user`, `security`
+
+Actions per module: `create`, `read`, `update`, `delete`
+
+Default role assignments:
+
+| Role | challan | taxToNBR | report | settlement | user | security |
+|------|---------|----------|--------|------------|------|----------|
+| `ADMIN` | CRUD | CRUD | CRUD | CRUD | CRUD | CRUD |
+| `TRECHOLDER` | CR | CR | R | R | — | — |
+| `ACCOUNTING` | CRU | CRU | R | RU | — | — |
+| `IT` | R | R | R | R | R | — |
+| `MARKETING` | R | R | R | — | — | — |
+
+> These are starting defaults. Admins can override any permission per-role or per-user via the Security UI.
+
+---
+
+## Frontend Implementation
+
+### Files
+
+| File | Purpose |
+|------|---------|
+| `src/types/security.types.ts` | Role, Permission, Policy, DTO types |
+| `src/services/security.service.ts` | API client for all security endpoints |
+| `src/hooks/useMyPermissions.ts` | React Query hook — fetches live permissions |
+| `src/components/ProtectedPage.tsx` | Page-level role gate |
+| `src/components/modules/admin/RolePermissionMatrix.tsx` | Module × Action checkbox grid |
+| `src/components/modules/admin/UserRoleAssignment.tsx` | Badge-based role assignment panel |
+| `src/components/modules/admin/UserPolicyPanel.tsx` | Per-user ALLOW/DENY override panel |
+| `src/app/(dashboardLayout)/admin/security/page.tsx` | Security Hub overview |
+| `src/app/(dashboardLayout)/admin/security/roles/page.tsx` | Roles list |
+| `src/app/(dashboardLayout)/admin/security/roles/[id]/page.tsx` | Role detail + permission matrix |
+| `src/app/(dashboardLayout)/admin/security/permissions/page.tsx` | Permission catalog |
+| `src/app/(dashboardLayout)/admin/security/users/[userId]/page.tsx` | User security (roles + policies) |
+
+### `useMyPermissions` Hook
+
+The central hook for **all** frontend permission checks. Calls `GET /security/my-permissions` on mount and window focus.
+
+```typescript
+import { useMyPermissions } from "@/hooks/useMyPermissions";
+
+export function MyPage() {
+  const { canCreate, canUpdate, canDelete, hasPermission } = useMyPermissions();
+
+  const canCreateChallan = canCreate("challan");
+  const canUpdateChallan = canUpdate("challan");
+  const canDeleteChallan = canDelete("challan");
+
+  return (
+    <>
+      {canCreateChallan && <Button>Create Challan</Button>}
+      <DataTable
+        onEdit={canUpdateChallan ? handleEdit : undefined}
+        onDelete={canDeleteChallan ? handleDelete : undefined}
+      />
+    </>
+  );
+}
 ```
 
-**TrecHolder Navigation:**
-```
-Financial
-├── Challans (/dashboard/challans)
-└── Tax to NBR (/dashboard/tax-to-nbr)
+**Configuration:**
+```typescript
+{
+  queryKey: ["my-permissions"],
+  staleTime: 0,               // Always re-fetch on mount
+  refetchOnMount: true,
+  refetchOnWindowFocus: true,
+}
 ```
 
-### 3. **Components**
+### `ProtectedPage` Component
 
-#### `src/components/ProtectedPage.tsx`
-Wrapper component for page-level access control:
+Used for page-level role-based gating (coarse-grained, role string check):
 
 ```tsx
 import { ProtectedPage } from "@/components/ProtectedPage";
 
-// Usage in pages
-<ProtectedPage 
+<ProtectedPage
   userRole={userRole}
-  allowedRoles={["ADMIN", "TRECHOLDER"]}
-  fallbackMessage="Only Admin and TrecHolders can access this page"
+  allowedRoles={["ADMIN", "IT", "ACCOUNTING", "TRECHOLDER"]}
+  fallbackMessage="You don't have permission to access this page"
 >
-  {/* Protected content */}
+  {/* page content */}
 </ProtectedPage>
 ```
 
-#### `src/components/modules/challan/ChallanDataTable.tsx` (Updated)
-Enhanced with role-based actions:
-- Only ADMIN can edit/update
-- Only ADMIN can delete
-- TRECHOLDER can view only
+### Cache Invalidation on Admin Save
 
-```tsx
-<ChallanDataTable
-  data={data}
-  userRole={userRole}        // Pass user role
-  onEdit={handleEdit}         // Only shown for ADMIN
-  onDelete={handleDelete}     // Only shown for ADMIN
-  onExport={handleExport}     // Visible to both
-/>
-```
-
-#### `src/components/modules/taxToNBR/TaxToNBRDataTable.tsx` (Updated)
-Same role-based control as Challan:
-- Only ADMIN can edit/update
-- Only ADMIN can delete
-- TRECHOLDER can view only
-
-### 4. **Hooks**
-
-#### `src/hooks/usePermissions.ts`
-Custom hook for checking permissions:
+When an admin saves a role's permission matrix via the Security UI, the frontend immediately invalidates the local React Query cache:
 
 ```typescript
-import { usePermissions } from "@/hooks/usePermissions";
-
-export function MyComponent() {
-  const { challan, taxToNBR, getFilter } = usePermissions(userRole, userId);
-
-  // Check Challan permissions
-  challan.canAccess      // ✓ Can access page
-  challan.canCreate      // ✓ Can create records
-  challan.canUpdate      // ✓ Can edit records
-  challan.canDelete      // ✓ Can delete records
-  challan.canViewAll     // ✓ Can see all records
-
-  // Get filter for queries
-  const filter = getFilter();
-}
+// In roles/[id]/page.tsx — handleSaveMatrix
+await queryClient.invalidateQueries({ queryKey: MY_PERMISSIONS_KEY });
 ```
 
-## Implementation Examples
-
-### Example 1: Protected Admin Page
-
-```tsx
-'use client';
-
-import { ProtectedPage } from "@/components/ProtectedPage";
-import { ChallanDataTable } from "@/components/modules/challan/ChallanDataTable";
-import { useChallans, useDeleteChallan } from "@/hooks/useChallan";
-import { usePermissions } from "@/hooks/usePermissions";
-
-export default function AdminChallansPage({ userRole, userId }) {
-  const { challan } = usePermissions(userRole as UserRole, userId);
-  const { data, isLoading } = useChallans();
-  const { mutate: deleteChallan } = useDeleteChallan();
-
-  return (
-    <ProtectedPage
-      userRole={userRole}
-      allowedRoles={["ADMIN"]}
-      fallbackMessage="Only Admins can manage challans"
-    >
-      <ChallanDataTable
-        data={data?.data || []}
-        isLoading={isLoading}
-        userRole={userRole}
-        onDelete={challan.canDelete ? handleDelete : undefined}
-      />
-    </ProtectedPage>
-  );
-}
-```
-
-### Example 2: Conditional Button Rendering
-
-```tsx
-import { usePermissions } from "@/hooks/usePermissions";
-
-export function ChallanActions({ userRole }) {
-  const { challan } = usePermissions(userRole as UserRole);
-
-  return (
-    <div>
-      {challan.canCreate && (
-        <Button onClick={handleCreate}>+ Create Challan</Button>
-      )}
-      {challan.canUpdate && (
-        <Button onClick={handleEdit} variant="outline">Edit</Button>
-      )}
-      {challan.canDelete && (
-        <Button onClick={handleDelete} variant="destructive">Delete</Button>
-      )}
-    </div>
-  );
-}
-```
-
-### Example 3: API Filtering
-
-```tsx
-import { usePermissions } from "@/hooks/usePermissions";
-import { useChallans } from "@/hooks/useChallan";
-
-export function ChallansList({ userRole, userId }) {
-  const { getFilter } = usePermissions(userRole as UserRole, userId);
-  const filter = getFilter();
-
-  // For TRECHOLDER: filter will be { memberId: userId }
-  // For ADMIN: filter will be {}
-  const { data } = useChallans({ ...filter, page: 1, limit: 10 });
-
-  return <ChallanDataTable data={data?.data || []} userRole={userRole} />;
-}
-```
-
-## Permission Matrix
-
-| Operation | ADMIN | TRECHOLDER |
-|-----------|-------|-----------|
-| View Challans | ✅ (All) | ✅ (Own only) |
-| Create Challan | ✅ | ❌ |
-| Update Challan | ✅ | ❌ |
-| Delete Challan | ✅ | ❌ |
-| Bulk Delete | ✅ | ❌ |
-| Export | ✅ (All) | ✅ (Own only) |
-| **View TaxToNBR** | ✅ (All) | ✅ (Own only) |
-| Create TaxToNBR | ✅ | ❌ |
-| Update TaxToNBR | ✅ | ❌ |
-| Delete TaxToNBR | ✅ | ❌ |
-| Bulk Delete | ✅ | ❌ |
-| Export | ✅ (All) | ✅ (Own only) |
-
-## Navigation Menu Structure
-
-### Admin Dashboard
-```
-Dashboard
-├── Home
-├── Admin Dashboard
-├── My Profile
-
-Reports
-├── New Report
-├── Download Center
-
-User Management
-└── Users
-
-Financial Management
-├── Challans
-└── Tax to NBR
-
-Operations
-├── Data Tables
-└── Settlements
-
-Settings
-└── Change Password
-```
-
-### TrecHolder Dashboard
-```
-Dashboard
-├── Home
-├── TrecHolder Dashboard
-├── My Profile
-
-Reports
-├── New Report
-├── Download Center
-
-Financial
-├── Challans
-└── Tax to NBR
-
-TrecHolders
-├── My TrecHolders
-└── Premium Features
-
-Settings
-└── Change Password
-```
-
-## API Endpoints Access Control
-
-All endpoints have backend role-based access control:
-
-**Challan Endpoints:**
-- `GET /challan` - ADMIN, IT, TRECHOLDER (filtered by memberId for TRECHOLDER)
-- `GET /challan/:id` - ADMIN, IT, TRECHOLDER
-- `POST /challan` - ADMIN, IT only
-- `PATCH /challan/:id` - ADMIN, IT only
-- `DELETE /challan/:id` - ADMIN, IT only
-
-**TaxToNBR Endpoints:**
-- `GET /taxToNBR` - ADMIN, IT, ACCOUNTING, TRECHOLDER (filtered for TRECHOLDER)
-- `GET /taxToNBR/:id` - ADMIN, IT, ACCOUNTING, TRECHOLDER
-- `POST /taxToNBR` - ADMIN, IT, ACCOUNTING only
-- `PATCH /taxToNBR/:id` - ADMIN, IT, ACCOUNTING only
-- `DELETE /taxToNBR/:id` - ADMIN, IT only
-
-## Best Practices
-
-1. **Always pass userRole** to components that check permissions
-2. **Use ProtectedPage** for page-level access control
-3. **Use usePermissions hook** for conditional rendering
-4. **Server-side validation** - Always validate on backend too
-5. **Filter queries** - Use getFilter() to automatically filter by user
-6. **Toast notifications** - Provide feedback on permission denied
-
-## Security Notes
-
-⚠️ **Frontend checks are for UX only!** Always implement permission checks on the backend API.
-
-- Frontend RBAC improves user experience by hiding unavailable options
-- Backend API must validate permissions for every request
-- Never trust client-side permission checks for sensitive operations
-- Audit log all CRUD operations for compliance
-
-## Implementation Status
-
-### ✅ Completed Components
-
-#### 1. Authorization Utilities
-- **File**: `src/utils/rolePermissions.ts`
-- **Status**: ✅ Complete
-- All permission checking functions implemented
-
-#### 2. CRUD Dialog Component
-- **File**: `src/components/modules/shared/CrudDialog.tsx`
-- **Status**: ✅ Complete
-- Reusable dialog for Create/Edit/View operations
-- Supports loading states and form validation
-- Responsive design with proper footer actions
-
-#### 3. Form Components
-- **Challan**: `src/components/modules/challan/ChallanForm.tsx` ✅
-- **TaxToNBR**: `src/components/modules/taxToNBR/TaxToNBRForm.tsx` ✅
-- Clean form validation with error handling
-- Support for both create and edit modes
-- Properly formatted numeric inputs for financial data
-
-#### 4. Data Table Components
-- **Challan**: `src/components/modules/challan/ChallanDataTable.tsx` ✅
-- **TaxToNBR**: `src/components/modules/taxToNBR/TaxToNBRDataTable.tsx` ✅
-- Role-based action rendering
-- Safe currency formatting
-- Pagination and bulk actions support
-
-#### 5. Page Routes (Dialog-Based CRUD)
-
-**Admin Routes:**
-- `/admin/dashboard/challans` - List & Dialog CRUD ✅
-- `/admin/dashboard/tax-to-nbr` - List & Dialog CRUD ✅
-
-**TrecHolder Routes:**
-- `/dashboard/challans` - Read-only list ✅
-- `/dashboard/tax-to-nbr` - Read-only list ✅
-
-#### 6. Hooks for CRUD Operations
-- **useChallan.ts**: ✅ Complete with all mutations
-- **useTaxToNBR.ts**: ✅ Complete with all mutations
-- **usePermissions.ts**: ✅ Permission checking hook
+This ensures the admin's own UI reflects the new permissions without a page reload.
 
 ---
 
-## CRUD Architecture: Dialog-Based Approach
+## Permission Resolution Priority
 
-### Benefits of Dialog-Based CRUD:
-1. **User Experience**: No page navigation, instant feedback
-2. **Code Reusability**: Single form component for create/edit
-3. **Consistency**: Standard modal dialog across all modules
-4. **Performance**: No full page reload required
-5. **Mobile-Friendly**: Responsive dialog component
-6. **State Management**: Easier to manage dialog state
-
-### Component Hierarchy:
 ```
-Page (admin/dashboard/challans/page.tsx)
-├── Dialog State Management
-│   ├── dialogOpen
-│   ├── dialogMode ("create" | "edit" | "view")
-│   └── selectedRecord
-├── CrudDialog Component
-│   ├── Form (ChallanForm/TaxToNBRForm)
-│   ├── Loading State
-│   └── Action Buttons
-└── DataTable Component
-    ├── List View
-    ├── Pagination
-    └── Row Actions (Edit/Delete)
+Policy DENY  >  Policy ALLOW  >  Role-level ALLOW  >  No entry (DENY)
 ```
 
-### Data Flow for Create:
-```
-User Click "Create Button"
-    ↓
-handleOpenDialog("create")
-    ↓
-CrudDialog Opens with Mode="create"
-    ↓
-ChallanForm Renders (empty)
-    ↓
-User Fills Form & Clicks "Create"
-    ↓
-handleCreateSubmit() Called
-    ↓
-useCreateChallan Mutation
-    ↓
-POST /api/v1/challans
-    ↓
-Success: Close Dialog → Refetch List
-Error: Show Toast → Keep Dialog Open
-```
-
-### Data Flow for Edit:
-```
-User Click "Edit Button" on Row
-    ↓
-handleOpenDialog("edit", challan)
-    ↓
-CrudDialog Opens with Mode="edit"
-    ↓
-ChallanForm Renders (Pre-populated)
-    ↓
-User Updates & Clicks "Update"
-    ↓
-handleEditSubmit() Called
-    ↓
-useUpdateChallan Mutation
-    ↓
-PATCH /api/v1/challans/:id
-    ↓
-Success: Close Dialog → Refetch List
-Error: Show Toast → Keep Dialog Open
-```
-
-#### 1. Authorization Utilities
-- **File**: `src/utils/rolePermissions.ts`
-- **Status**: ✅ Complete
-- All permission checking functions implemented:
-  - `canPerformCRUD()` - ADMIN, TRECHOLDER
-  - `canAccessChallanCRUD()` - ADMIN, TRECHOLDER
-  - `canAccessTaxToNBRCRUD()` - ADMIN, TRECHOLDER
-  - Create/Update/Delete operations (ADMIN only)
-  - `canViewAllRecords()` - ADMIN only
-  - `getRecordFilter()` - Filter by role/userId
-
-#### 2. Navigation Items
-- **File**: `src/utils/navItems.ts`
-- **Status**: ✅ Complete with Financial Management sections
-  - Admin Navigation includes Challans & Tax to NBR
-  - TrecHolder Navigation includes Challans & Tax to NBR
-  - All menu items properly routed
-
-#### 3. ProtectedPage Component
-- **File**: `src/components/ProtectedPage.tsx`
-- **Status**: ✅ Complete
-- Provides page-level access control
-- Shows permission denied alerts
-- Navigation fallback buttons
-
-#### 4. usePermissions Hook
-- **File**: `src/hooks/usePermissions.ts`
-- **Status**: ✅ Complete
-- Returns CRUD permissions for modules
-- Includes `getFilter()` for query filtering
-- Supports both Challan and TaxToNBR modules
-
-#### 5. Data Table Components
-- **Challan**: `src/components/modules/challan/ChallanDataTable.tsx` ✅
-- **TaxToNBR**: `src/components/modules/taxToNBR/TaxToNBRDataTable.tsx` ✅
-- Role-based action rendering (Edit/Delete for ADMIN only)
-- Safe currency formatting (handles Decimal objects from backend)
-- Pagination and bulk actions support
-
-#### 6. Page Routes
-
-**Admin Routes:**
-- `/admin/dashboard/challans` - List page ✅
-- `/admin/dashboard/challans/create` - Create page ✅
-- `/admin/dashboard/challans/[id]/edit` - Edit page ✅
-- `/admin/dashboard/tax-to-nbr` - List page ✅
-- `/admin/dashboard/tax-to-nbr/create` - Create page ✅
-- `/admin/dashboard/tax-to-nbr/[id]/edit` - Edit page ✅
-
-**TrecHolder Routes:**
-- `/dashboard/challans` - Read-only list ✅ (Create button removed)
-- `/dashboard/tax-to-nbr` - Read-only list ✅ (Create button removed)
-
-#### 7. Type Definitions
-- **TaxToNBR**: `src/types/taxToNBR.types.ts` ✅
-- **Challan**: `src/types/challan.types.ts` ✅
-- All CRUD payload types defined
-
-#### 8. Hooks for CRUD Operations
-- **useTaxToNBR.ts**: ✅ Complete with all mutations
-- **useChallan.ts**: ✅ Complete with all mutations
+| Source | Effect | Priority |
+|--------|--------|----------|
+| `Policy` (per-user DENY) | ❌ Denies regardless of role | Highest |
+| `Policy` (per-user ALLOW) | ✅ Explicitly granted | 2nd |
+| `RolePermission` (role-level ALLOW) | ✅ Granted via role | 3rd |
+| No entry at all | ❌ Denied by default | Lowest |
 
 ---
 
-## Verified Security Features
+## Admin Security UI Navigation
 
-### Frontend Protection
-1. **ProtectedPage**: Page-level role checks
-2. **usePermissions**: Component-level permission checks
-3. **Conditional Rendering**: Buttons/actions hidden for unauthorized roles
-4. **Route Guards**: Proper allowedRoles configuration on all protected pages
-5. **Data Table Actions**: Edit/Delete buttons only for ADMIN
+Added to Admin sidebar under **Security**:
 
-### Backend Expectations
-All endpoints should validate:
-- User authentication (via session/token)
-- User role authorization
-- Record ownership (for TRECHOLDER filtering)
-- Request payload validation
+```
+Security
+├── /admin/security            — Security Hub overview
+├── /admin/security/roles      — Roles list + create
+│   └── /admin/security/roles/[id]  — Role detail + permission matrix
+├── /admin/security/permissions — Permission catalog (read-only)
+└── /admin/security/users/[userId]  — User roles + policy overrides
+```
+
+Access to per-user security management is also available from the Users table via the "Manage" button.
 
 ---
 
-## Known Issues & Resolved Fixes
+## Module Permission Map
 
-### Issue 1: TaxToNBR Data Displaying as "[object Object]" ✅ RESOLVED
+Current permission modules and actions:
 
-**Root Cause:** Prisma Decimal objects were not being serialized properly to primitive types before sending to frontend.
-
-**Solution Implemented**: Use only `serializeBigInt` utility to serialize both BigInt and Decimal fields together:
-
-```typescript
-// Backend: Use serializeBigInt only (handles both BigInt and Decimal conversion)
-const serialized = serializeBigInt(taxToNBRs);
-return {
-  data: serialized,
-  meta: { page, limit, total, totalPages }
-};
-```
-
-**How it works:**
-- `serializeBigInt` uses JSON.stringify replacer to convert values
-- BigInt values are converted to strings: `123n` → `"123"`
-- Decimal objects are also JSON-serialized properly through the replacer
-- Result: All numeric fields arrive at frontend as proper numbers or strings
-
-**Benefits:**
-- ✅ No need for separate `serializeDecimal` utility
-- ✅ Simpler, single-pass serialization
-- ✅ Numeric fields properly represented in API response
-- ✅ Frontend receives clean, serializable data
-
-**Status**: ✅ Applied in backend services - only `serializeBigInt` used
+| Module | Actions | Notes |
+|--------|---------|-------|
+| `challan` | `create`, `read`, `update`, `delete` | Challan financial records |
+| `taxToNBR` | `create`, `read`, `update`, `delete` | Tax to NBR records |
+| `report` | `create`, `read`, `update`, `delete` | Report generation |
+| `settlement` | `create`, `read`, `update`, `delete` | Settlements |
+| `user` | `create`, `read`, `update`, `delete` | User management |
+| `security` | `create`, `read`, `update`, `delete` | RBAC management |
 
 ---
 
-### Issue 2: Create & Edit Pages Return 404 ✅ RESOLVED
+## CRUD Permission Matrix Per Page
 
-**Status**: ✅ All pages exist and properly protected
+### `dashboard/challans` (TRECHOLDER dashboard)
 
-**Current File Structure:**
-```
-✅ src/app/(dashboardLayout)/admin/dashboard/challans/
-├── page.tsx                          # ✅ List page
-├── create/
-│   └── page.tsx                      # ✅ Create page exists
-└── [id]/
-    └── edit/
-        └── page.tsx                  # ✅ Edit page exists
+| Action | Roles | Source |
+|--------|-------|--------|
+| View page | `TRECHOLDER`, `ADMIN` | `ProtectedPage.allowedRoles` |
+| Create button | Dynamic | `useMyPermissions().canCreate("challan")` |
+| Edit row action | Dynamic | `useMyPermissions().canUpdate("challan")` |
+| Delete row action | Dynamic | `useMyPermissions().canDelete("challan")` |
 
-✅ src/app/(dashboardLayout)/admin/dashboard/tax-to-nbr/
-├── page.tsx                          # ✅ List page
-├── create/
-│   └── page.tsx                      # ✅ Create page exists
-└── [id]/
-    └── edit/
-        └── page.tsx                  # ✅ Edit page exists
+### `admin/dashboard/challans` (Admin dashboard)
 
-✅ src/app/(dashboardLayout)/dashboard/challans/
-└── page.tsx                          # ✅ TrecHolder read-only list
+| Action | Roles | Source |
+|--------|-------|--------|
+| View page | `ADMIN`, `IT`, `ACCOUNTING`, `TRECHOLDER` | `ProtectedPage.allowedRoles` |
+| Create button | Dynamic | `useMyPermissions().canCreate("challan")` |
+| Edit row action | Dynamic | `useMyPermissions().canUpdate("challan")` |
+| Delete row action | Dynamic | `useMyPermissions().canDelete("challan")` |
 
-✅ src/app/(dashboardLayout)/dashboard/tax-to-nbr/
-└── page.tsx                          # ✅ TrecHolder read-only list
-```
-
-**Implementation Details:**
-
-Create and Edit pages properly:
-- ✅ Protect pages with `<ProtectedPage allowedRoles={["ADMIN"]}>`
-- ✅ Use `useCreateTaxToNBR()` and `useUpdateTaxToNBR()` hooks
-- ✅ Redirect to list page on success
-- ✅ Show loading and error states
-- ✅ Back button for navigation
-
-TrecHolder pages properly:
-- ✅ Remove create buttons (TrecHolders cannot create)
-- ✅ Display read-only data tables
-- ✅ Only show view/export operations
-- ✅ Filter data by memberId automatically (via backend)
+Same pattern applies to `dashboard/tax-to-nbr` and `admin/dashboard/tax-to-nbr`.
 
 ---
 
-### Issue 3: API Endpoint Inconsistency ✅ VERIFIED
+## Data Flow: How Permission Change Takes Effect
 
-**Status**: ✅ Frontend endpoints are consistent
-
-**Frontend API Endpoints:**
-```typescript
-// Service calls use these endpoints
-GET /api/v1/tax-to-nbr           // ✓ List with pagination
-GET /api/v1/tax-to-nbr/:id       // ✓ Single record
-POST /api/v1/tax-to-nbr          // ✓ Create (ADMIN only)
-PATCH /api/v1/tax-to-nbr/:id     // ✓ Update (ADMIN only)
-DELETE /api/v1/tax-to-nbr/:id    // ✓ Delete (ADMIN only)
 ```
-
-**Similar endpoints for Challans:**
-```typescript
-GET /api/v1/challan              // ✓ List with pagination
-GET /api/v1/challan/:id          // ✓ Single record
-POST /api/v1/challan             // ✓ Create (ADMIN only)
-PATCH /api/v1/challan/:id        // ✓ Update (ADMIN only)
-DELETE /api/v1/challan/:id       // ✓ Delete (ADMIN only)
-DELETE /api/v1/challan/bulk/delete      // ✓ Bulk delete (ADMIN only)
+Admin changes role permission matrix in UI
+  ↓
+PUT /security/roles/:id/permissions
+  ↓
+security.service.ts: updateRolePermissions()
+  ├─ Delete old RolePermission records
+  ├─ Insert new RolePermission records
+  ├─ Find all users by UserRole join table (where roleId = this role)
+  ├─ Find all users by User.role string column (where role = role.name)
+  └─ Invalidate Redis cache: cacheDel("perm:{userId}") for ALL affected users
+  ↓
+Frontend: queryClient.invalidateQueries({ queryKey: ["my-permissions"] })
+  ↓
+Next page navigation or window focus triggers useMyPermissions() refetch
+  ↓
+GET /security/my-permissions → fresh resolved permissions
+  ↓
+UI controls (buttons, row actions) update immediately
 ```
-
-**Backend Implementation Required:**
-All endpoints must validate:
-- ✅ User authentication (session/JWT)
-- ✅ User role authorization (ADMIN/IT for write operations)
-- ✅ Record ownership (filter by memberId for TRECHOLDER)
-- ✅ Request payload validation
-- ✅ Audit logging of CRUD operations
 
 ---
 
-## Completed Implementation Steps
+## Known Behaviour Notes
 
-### Step 1: Fix TaxToNBR Data Types (Backend) ✅
-Safe currency formatter implemented in frontend to handle Decimal objects.
-**Note**: Backend should ideally return numbers, not Decimal objects.
+1. **Dual Role Sources**: Users are assigned roles in two ways:
+   - `User.role` string column (legacy, set at registration/admin assignment)
+   - `UserRole` join table (explicit RBAC assignment via Security UI)
+   - Both sources are merged during permission resolution.
 
-### Step 2: Create Missing Pages ✅
-All create and edit pages implemented and properly protected:
-- `src/app/(dashboardLayout)/admin/dashboard/tax-to-nbr/create/page.tsx`
-- `src/app/(dashboardLayout)/admin/dashboard/tax-to-nbr/[id]/edit/page.tsx`
-- `src/app/(dashboardLayout)/admin/dashboard/challans/create/page.tsx`
-- `src/app/(dashboardLayout)/admin/dashboard/challans/[id]/edit/page.tsx`
+2. **DENY wins unconditionally**: A Policy DENY on a user overrides any role-level ALLOW for the same permission.
 
-### Step 3: Add Form Component ✅
-Data input validation handled by:
-- Backend validation (primary)
-- Frontend type definitions and Zod schemas
-- Error handling and toast notifications
+3. **Cache TTL**: Redis permission cache expires after 5 minutes. Cache is also invalidated immediately on any role/policy change.
 
-### Step 4: Update API Endpoints ✅
-All endpoints follow REST convention with proper routing.
-Backend must implement role-based access control.
+4. **Frontend staleTime = 0**: `useMyPermissions()` always refetches on component mount and window focus, ensuring UI reflects any admin-side changes within one navigation.
 
-### Step 5: Fix TrecHolder Pages ✅
-- Removed create buttons from TrecHolder pages
-- TrecHolders can only view their own records (read-only)
-- No edit/delete operations available to TrecHolders
-- Backend filters data by memberId for TrecHolders
+5. **Backend enforcement**: Frontend checks are UX-only. All write endpoints still validate roles via `checkAuth()` on the backend. The `requirePermission()` middleware can be added incrementally per route for fine-grained enforcement.
 
 ---
 
-## Serialization Guide: TaxToNBR Data Handling
+## Security Best Practices
 
-### Overview
-TaxToNBR and Challan APIs return numeric data with BigInt and Decimal fields from Prisma ORM. These need to be properly serialized before sending to the frontend.
-
-### Solution: serializeBigInt Utility
-
-**Backend Implementation:**
-```typescript
-import { serializeBigInt } from "../../shared/serializeBigInt.js";
-
-const getAllTaxToNBRs = async (query: TaxToNBRQuery) => {
-    // ... database query logic ...
-    
-    const [taxToNBRs, total] = await Promise.all([
-        db.cns.taxToNBR.findMany({ /* ... */ }),
-        db.cns.taxToNBR.count({ /* ... */ }),
-    ]);
-
-    // ✅ Apply serialization to handle BigInt and Decimal
-    const serialized = serializeBigInt(taxToNBRs);
-    
-    return {
-        data: serialized,
-        meta: {
-            page,
-            limit,
-            total,
-            totalPages: Math.ceil(total / limit),
-        },
-    };
-};
-```
-
-**How serializeBigInt Works:**
-```typescript
-export function serializeBigInt<T>(obj: T): T {
-  return JSON.parse(
-    JSON.stringify(obj, (_, value) =>
-      typeof value === "bigint" ? value.toString() : value
-    )
-  );
-}
-```
-
-- Uses JSON.stringify with a custom replacer function
-- Converts `bigint` values to strings
-- Handles nested objects and arrays
-- Decimal objects are automatically serialized through JSON.stringify
-
-**Result:**
-```json
-{
-  "data": [
-    {
-      "id": "123",
-      "tradeVolume": 100000.5,
-      "cseCommission": 5000.25,
-      "paymentAmount": 125000.75,
-      "createdAt": "2024-01-15T10:30:00Z"
-    }
-  ],
-  "meta": {
-    "page": 1,
-    "limit": 10,
-    "total": 50,
-    "totalPages": 5
-  }
-}
-```
-
-### Files Using serializeBigInt
-
-**Backend Services:**
-- `src/app/modules/taxToNBR/taxToNBR.service.ts`
-  - `getAllTaxToNBRs()` - List with pagination
-  - `getTaxToNBRById()` - Single record
-  - `createTaxToNBR()` - After creation
-  - `updateTaxToNBR()` - After update
-  - `deleteTaxToNBR()` - After deletion
-
-- `src/app/modules/challan/challan.service.ts`
-  - Similar pattern for Challan data
-
-### Frontend Type Definitions
-
-**Frontend expects proper numeric types:**
-```typescript
-export interface TaxToNBRItem {
-  id: string;
-  tradeVolume?: number | null;
-  cseCommission?: number | null;
-  paymentAmount?: number | null;
-  // ... other fields
-}
-```
-
-### Verification Checklist
-- [x] Backend uses `serializeBigInt()` on all responses
-- [x] No need for separate `serializeDecimal()` utility
-- [x] Network response shows proper numbers (not objects)
-- [x] Frontend receives clean, serializable data
-- [x] Currency formatting works correctly in tables
-- [x] All CRUD operations work properly
-- [x] Filtering and sorting work on numeric columns
+- ✅ Frontend RBAC is **UX-only** — never trust client-side checks for security.
+- ✅ Backend `checkAuth()` validates JWT/session on every request.
+- ✅ `requirePermission()` middleware can be added per-route for fine-grained API enforcement.
+- ✅ All security management actions are ADMIN-only.
+- ✅ Audit log entries are written for all RBAC changes (`writeAuditLog`).
+- ✅ System roles (`isSystem: true`) cannot be deleted via API.
+- ✅ Redis cache is invalidated immediately on permission changes — no stale grants.

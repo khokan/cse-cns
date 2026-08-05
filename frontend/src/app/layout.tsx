@@ -10,6 +10,7 @@ import Navbar from "@/components/shared/navbar";
 import { ThemeProvider } from "@/components/providers/theme-provider";
 import QueryProviders from "@/components/providers/Queryprovider";
 import { PerformanceMonitor } from "@/components/providers/performance-monitor";
+import { TooltipProvider } from "@/components/ui/tooltip";
 
 export const metadata: Metadata = {
   title: "CSE Insights",
@@ -27,8 +28,10 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <ThemeProvider>
           <QueryProviders>
             <PerformanceMonitor />
+            <TooltipProvider>
             <main className="min-h-[calc(100vh-170px)]">{children}</main>
             <Toaster richColors position="top-right" />
+            </TooltipProvider>
           </QueryProviders>
         </ThemeProvider>
       </body>

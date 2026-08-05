@@ -8,10 +8,6 @@ import { TanstackDataTable } from "@/components/modules/datatable/tanstack-data-
 import { Pencil } from "lucide-react";
 import type { TaxToNBRItem } from "@/types/taxToNBR.types";
 import type { UserRole } from "@/utils/authUtils";
-import {
-  canUpdateTaxToNBR,
-  canDeleteTaxToNBR,
-} from "@/utils/rolePermissions";
 
 /**
  * Safe currency formatter - handles numbers, strings, and Decimal objects
@@ -68,6 +64,8 @@ const formatCurrency = (value: unknown): string => {
   return isNaN(numValue) ? "—" : `৳${numValue.toLocaleString()}`;
 };
 
+import { useMyPermissions } from "@/hooks/useMyPermissions";
+
 interface TaxToNBRTableProps {
   data: TaxToNBRItem[];
   isLoading?: boolean;
@@ -97,9 +95,14 @@ export function TaxToNBRDataTable({
   onPageChange,
   onPageSizeChange,
 }: TaxToNBRTableProps) {
-  // Check user permissions
-  const canUpdate = canUpdateTaxToNBR(userRole as UserRole);
-  const canDelete = canDeleteTaxToNBR(userRole as UserRole);
+  const { canUpdate: checkUpdate, canDelete: checkDelete } = useMyPermissions();
+  // Dynamic permission check from backend RBAC policy
+  const canUpdate = checkUpdate("taxToNBR");
+  const canDelete = checkDelete("taxToNBR");
+
+
+
+
   const columns: ColumnDef<TaxToNBRItem>[] = React.useMemo(
     () => [
       {

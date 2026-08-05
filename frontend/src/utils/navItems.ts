@@ -59,9 +59,29 @@ export const AdminNavItems: NavSection[] = [
         title: "User Management",
         items: [
             {
-                title: "users",
+                title: "Users",
                 href: "/admin/dashboard/users",
+                icon: "Users",
+            },
+        ],
+    },
+    {
+        title: "Security",
+        items: [
+            {
+                title: "Security Hub",
+                href: "/admin/security",
+                icon: "ShieldCheck",
+            },
+            {
+                title: "Roles",
+                href: "/admin/security/roles",
                 icon: "Shield",
+            },
+            {
+                title: "Permissions",
+                href: "/admin/security/permissions",
+                icon: "KeyRound",
             },
         ],
     },
@@ -96,6 +116,7 @@ export const AdminNavItems: NavSection[] = [
         ],
     },
 ];
+
 
 export const TrecHolderNavItems: NavSection[] = [
     {

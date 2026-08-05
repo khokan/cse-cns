@@ -22,28 +22,28 @@ router.get(
 // Create Challan
 router.post(
     "/",
-    checkAuth(UserRole.ADMIN, UserRole.IT),
+    checkAuth(UserRole.ADMIN, UserRole.IT, UserRole.TRECHOLDER),
     ChallanController.createChallan
 );
 
 // Update Challan
 router.patch(
     "/:id",
-    checkAuth(UserRole.ADMIN, UserRole.IT),
+    checkAuth(UserRole.ADMIN, UserRole.IT, UserRole.TRECHOLDER),
     ChallanController.updateChallan
 );
 
 // Bulk Delete Challans
 router.delete(
     "/bulk",
-    checkAuth(UserRole.ADMIN, UserRole.IT),
+    checkAuth(UserRole.ADMIN, UserRole.IT, UserRole.TRECHOLDER),
     ChallanController.bulkDeleteChallans
 );
 
 // Delete Challan
 router.delete(
     "/:id",
-    checkAuth(UserRole.ADMIN, UserRole.IT),
+    checkAuth(UserRole.ADMIN, UserRole.IT, UserRole.TRECHOLDER),
     ChallanController.deleteChallan
 );
 

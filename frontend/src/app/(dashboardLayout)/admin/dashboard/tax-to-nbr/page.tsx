@@ -129,7 +129,7 @@ export default function AdminTaxToNBRPage() {
               View, create, and manage all tax to NBR records.
             </p>
           </div>
-          {userRole === "ADMIN" && (
+          {["ADMIN", "ACCOUNTING", "TRECHOLDER"].includes(userRole) && (
             <Button onClick={() => handleOpenDialog("create")} className="gap-2" disabled={isLoading}>
               <Plus className="h-4 w-4" />
               Create Record
@@ -149,14 +149,16 @@ export default function AdminTaxToNBRPage() {
           data={taxToNBRData?.data || []}
           isLoading={isLoading}
           userRole={userRole}
-          onEdit={userRole === "ADMIN" ? (record) => handleOpenDialog("edit", record) : undefined}
-          onDelete={userRole === "ADMIN" ? handleDelete : undefined}
+          onEdit={["ADMIN", "ACCOUNTING", "TRECHOLDER"].includes(userRole) ? (record) => handleOpenDialog("edit", record) : undefined}
+          onDelete={["ADMIN", "ACCOUNTING"].includes(userRole) ? handleDelete : undefined}
           pageIndex={pageIndex}
           pageSize={pageSize}
           totalRecords={taxToNBRData?.meta?.total || 0}
           onPageChange={setPageIndex}
           onPageSizeChange={setPageSize}
         />
+
+
       </div>
 
       {/* CRUD Dialog */}

@@ -7,11 +7,7 @@ import { Button } from "@/components/ui/button";
 import { TanstackDataTable } from "@/components/modules/datatable/tanstack-data-table";
 import { Pencil } from "lucide-react";
 import type { ChallanItem } from "@/types/challan.types";
-import type { UserRole } from "@/utils/authUtils";
-import {
-  canUpdateChallan,
-  canDeleteChallan,
-} from "@/utils/rolePermissions";
+import { useMyPermissions } from "@/hooks/useMyPermissions";
 
 interface ChallanTableProps {
   data: ChallanItem[];
@@ -42,9 +38,14 @@ export function ChallanDataTable({
   onPageChange,
   onPageSizeChange,
 }: ChallanTableProps) {
-  // Check user permissions
-  const canUpdate = canUpdateChallan(userRole as UserRole);
-  const canDelete = canDeleteChallan(userRole as UserRole);
+  const { canUpdate: checkUpdate, canDelete: checkDelete } = useMyPermissions();
+  // Dynamic permission check from backend RBAC policy
+  const canUpdate = checkUpdate("challan");
+  const canDelete = checkDelete("challan");
+
+
+
+
   const columns: ColumnDef<ChallanItem>[] = React.useMemo(
     () => [
       {
