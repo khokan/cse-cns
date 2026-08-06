@@ -2,10 +2,10 @@ model User {
   id                 String      @id @default(uuid())
   name               String
   email              String      @unique
-  emailVerified      Boolean     @default(false)
   role               String      @default("TRECHOLDER")
-  trecHolderId       String?     // Member ID / TREC ID for TRECHOLDER role (null for ADMIN)
-  status             String      @default("ACTIVE")
+  emailVerified      Boolean     @default(false)
+  trecHolderId       String?     @db.NVarChar(128)  // Member ID / TREC ID for TRECHOLDER role (null for ADMIN)
+  status             String      @default("INACTIVE")  // ACTIVE | INACTIVE | SUSPENDED | DELETED
   needPasswordChange Boolean     @default(false)
   isDeleted          Boolean     @default(false)
   deletedAt          DateTime?
@@ -18,6 +18,8 @@ model User {
   // RBAC relations
   userRoles          UserRole[]
   policies           Policy[]
+
+  member             Member?    @relation(fields: [trecHolderId], references: [MemberID], onDelete: Cascade)
 }
 
 model Session {

@@ -4,6 +4,8 @@ import { sendResponse } from "../../shared/sendResponse.js";
 import { AdminService } from "./admin.service.js";
 import status from "http-status";
 
+// ─── Read ──────────────────────────────────────────────────────────────────────
+
 const getUsers = catchAsync(async (req: Request, res: Response) => {
     const query = req.query;
     const result = await AdminService.getUsers(query);
@@ -18,8 +20,8 @@ const getUsers = catchAsync(async (req: Request, res: Response) => {
 });
 
 const getUser = catchAsync(async (req: Request, res: Response) => {
-    const { id } = req.params;
-    const result = await AdminService.getUser(id as string);
+    const id = req.params.id as string;
+    const result = await AdminService.getUser(id);
 
     sendResponse(res, {
         httpStatusCode: status.OK,
@@ -29,12 +31,26 @@ const getUser = catchAsync(async (req: Request, res: Response) => {
     });
 });
 
-const updateUser = catchAsync(async (req: Request, res: Response) => {
-    const { id } = req.params;
-    const adminUserId = req.user!.userId;
-    const dto = req.body;
+// ─── Create ────────────────────────────────────────────────────────────────────
 
-    const result = await AdminService.updateUser(id as string, dto, adminUserId);
+const createUser = catchAsync(async (req: Request, res: Response) => {
+    const actorId = req.user!.userId;
+    const result = await AdminService.createUser(req.body, actorId);
+
+    sendResponse(res, {
+        httpStatusCode: status.CREATED,
+        success: true,
+        message: "User created successfully.",
+        data: result,
+    });
+});
+
+// ─── Update (profile fields) ───────────────────────────────────────────────────
+
+const updateUser = catchAsync(async (req: Request, res: Response) => {
+    const id = req.params.id as string;
+    const actorId = req.user!.userId;
+    const result = await AdminService.updateUser(id, req.body, actorId);
 
     sendResponse(res, {
         httpStatusCode: status.OK,
@@ -44,11 +60,42 @@ const updateUser = catchAsync(async (req: Request, res: Response) => {
     });
 });
 
-const deleteUser = catchAsync(async (req: Request, res: Response) => {
-    const { id } = req.params;
-    const adminUserId = req.user!.userId;
+// ─── Update role (ADMIN only) ──────────────────────────────────────────────────
 
-    const result = await AdminService.deleteUser(id as string, adminUserId);
+const updateUserRole = catchAsync(async (req: Request, res: Response) => {
+    const id = req.params.id as string;
+    const actorId = req.user!.userId;
+    const result = await AdminService.updateUserRole(id, req.body, actorId);
+
+    sendResponse(res, {
+        httpStatusCode: status.OK,
+        success: true,
+        message: "User role updated successfully.",
+        data: result,
+    });
+});
+
+// ─── Toggle status (ADMIN + ACCOUNTING) ───────────────────────────────────────
+
+const toggleStatus = catchAsync(async (req: Request, res: Response) => {
+    const id = req.params.id as string;
+    const actorId = req.user!.userId;
+    const result = await AdminService.toggleUserStatus(id, req.body, actorId);
+
+    sendResponse(res, {
+        httpStatusCode: status.OK,
+        success: true,
+        message: `User ${req.body.status === "ACTIVE" ? "activated" : "deactivated"} successfully.`,
+        data: result,
+    });
+});
+
+// ─── Delete ────────────────────────────────────────────────────────────────────
+
+const deleteUser = catchAsync(async (req: Request, res: Response) => {
+    const id = req.params.id as string;
+    const actorId = req.user!.userId;
+    const result = await AdminService.deleteUser(id, actorId);
 
     sendResponse(res, {
         httpStatusCode: status.OK,
@@ -57,6 +104,8 @@ const deleteUser = catchAsync(async (req: Request, res: Response) => {
         data: result,
     });
 });
+
+// ─── Dashboard & audit logs ────────────────────────────────────────────────────
 
 const getDashboardStats = catchAsync(async (_req: Request, res: Response) => {
     const result = await AdminService.getDashboardStats();
@@ -85,7 +134,10 @@ const getAuditLogs = catchAsync(async (req: Request, res: Response) => {
 export const AdminController = {
     getUsers,
     getUser,
+    createUser,
     updateUser,
+    updateUserRole,
+    toggleStatus,
     deleteUser,
     getDashboardStats,
     getAuditLogs,

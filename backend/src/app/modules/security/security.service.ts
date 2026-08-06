@@ -70,7 +70,7 @@ const createRole = async (dto: CreateRoleDto, adminUserId: string) => {
         },
     });
 
-    writeAuditLog({ userId: adminUserId, action: "SECURITY_ROLE_CREATE", entity: "Role", entityId: role.id, payload: dto as Record<string, unknown> });
+    writeAuditLog({ userId: adminUserId, action: "SECURITY_ROLE_CREATE", entity: "Role", entityId: role.id, payload: dto as unknown as Record<string, unknown> });
     return role;
 };
 
@@ -81,7 +81,7 @@ const updateRole = async (id: string, dto: UpdateRoleDto, adminUserId: string) =
     }
 
     const updated = await db.cnsWeb.role.update({ where: { id }, data: dto });
-    writeAuditLog({ userId: adminUserId, action: "SECURITY_ROLE_UPDATE", entity: "Role", entityId: id, payload: dto as Record<string, unknown> });
+    writeAuditLog({ userId: adminUserId, action: "SECURITY_ROLE_UPDATE", entity: "Role", entityId: id, payload: dto as unknown as Record<string, unknown> });
     return updated;
 };
 
@@ -137,7 +137,7 @@ const createPermission = async (dto: CreatePermissionDto, adminUserId: string) =
     if (existing) throw new AppError(status.CONFLICT, `Permission '${dto.module}:${dto.action}' already exists.`);
 
     const perm = await db.cnsWeb.permission.create({ data: dto });
-    writeAuditLog({ userId: adminUserId, action: "SECURITY_PERMISSION_CREATE", entity: "Permission", entityId: perm.id, payload: dto as Record<string, unknown> });
+    writeAuditLog({ userId: adminUserId, action: "SECURITY_PERMISSION_CREATE", entity: "Permission", entityId: perm.id, payload: dto as unknown as Record<string, unknown> });
     return perm;
 };
 
@@ -181,16 +181,7 @@ const updateRolePermissions = async (
     // Invalidate cache for users assigned via UserRole join table
     const byJoinTable = await db.cnsWeb.userRole.findMany({ where: { roleId }, select: { userId: true } });
 
-    // Also invalidate cache for users whose User.role string column matches this role's name
-    const roleName = (role as { name?: string }).name ?? "";
-    const byRoleColumn = roleName
-        ? await db.cnsWeb.user.findMany({ where: { role: roleName }, select: { id: true } })
-        : [];
-
-    const allUserIds = new Set([
-        ...byJoinTable.map((ur) => ur.userId),
-        ...byRoleColumn.map((u) => u.id),
-    ]);
+    const allUserIds = new Set(byJoinTable.map((ur) => ur.userId));
 
     await Promise.all([...allUserIds].map((uid) => invalidateUserPermissionCache(uid)));
 
@@ -199,7 +190,7 @@ const updateRolePermissions = async (
         action: "SECURITY_ROLE_PERMISSIONS_UPDATE",
         entity: "Role",
         entityId: roleId,
-        payload: dto as Record<string, unknown>,
+        payload: dto as unknown as Record<string, unknown>,
     });
 
     return getRolePermissions(roleId);
@@ -246,7 +237,7 @@ const updateUserRoles = async (userId: string, dto: UpdateUserRolesDto, adminUse
         action: "SECURITY_USER_ROLES_UPDATE",
         entity: "User",
         entityId: userId,
-        payload: dto as Record<string, unknown>,
+        payload: dto as unknown as Record<string, unknown>,
     });
 
     return getUserRoles(userId);
@@ -292,7 +283,7 @@ const updateUserPolicies = async (
         action: "SECURITY_USER_POLICIES_UPDATE",
         entity: "User",
         entityId: userId,
-        payload: dto as Record<string, unknown>,
+        payload: dto as unknown as Record<string, unknown>,
     });
 
     return getUserPolicies(userId);

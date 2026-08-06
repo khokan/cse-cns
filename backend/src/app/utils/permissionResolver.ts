@@ -57,31 +57,7 @@ async function loadUserPermissions(userId: string): Promise<CachedPermissions> {
         }
     }
 
-    // 1b. Fallback/Include primary User.role string column (e.g. "TRECHOLDER")
-    const userRecord = await db.cnsWeb.user.findUnique({
-        where: { id: userId },
-        select: { role: true },
-    });
-
-    if (userRecord?.role) {
-        const primaryRole = await db.cnsWeb.role.findUnique({
-            where: { name: userRecord.role },
-            include: {
-                permissions: {
-                    include: { permission: true },
-                },
-            },
-        });
-
-        if (primaryRole) {
-            for (const rp of primaryRole.permissions) {
-                const key = `${rp.permission.module}:${rp.permission.action}`;
-                permMap[key] = "ALLOW";
-            }
-        }
-    }
-
-    // 2. Per-user policy overrides — DENY wins unconditionally
+    // 1b. Per-user policy overrides — DENY wins unconditionally
     const policies = await db.cnsWeb.policy.findMany({
         where: { userId },
         include: { permission: true },

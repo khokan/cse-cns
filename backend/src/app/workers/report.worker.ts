@@ -63,7 +63,7 @@ async function fetchUserActivity(filters: Filters): Promise<Record<string, unkno
                 }
                 : {}),
         },
-        include: { user: { select: { name: true, email: true, role: true } } },
+        include: { user: { select: { name: true, email: true } } },
         orderBy: { createdAt: "desc" },
         take: 1000,
     });
@@ -72,7 +72,6 @@ async function fetchUserActivity(filters: Filters): Promise<Record<string, unkno
         "Session ID": s.id,
         "User Name": s.user?.name ?? "",
         "User Email": s.user?.email ?? "",
-        "Role": s.user?.role ?? "",
         "IP Address": s.ipAddress ?? "",
         "User Agent": s.userAgent ?? "",
         "Created At": s.createdAt.toISOString().replace("T", " ").split(".")[0],

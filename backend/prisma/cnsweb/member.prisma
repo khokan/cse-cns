@@ -13,4 +13,5 @@ model Member {
   TIN               String? @db.NVarChar(Max)
   MobileNumber      String? @db.NVarChar(Max)
   EmailAddress      String? @db.NVarChar(Max)
+  users             User[]
 }

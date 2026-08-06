@@ -4,7 +4,7 @@ model ReportJob {
   reportType   String
   format       String
   filters      String?
-  status       String    @default("PENDING")
+  status       String          @default("PENDING")  // PENDING | PROCESSING | COMPLETED | FAILED
   queueJobId   String?
   filePath     String?
   fileSize     Int?
